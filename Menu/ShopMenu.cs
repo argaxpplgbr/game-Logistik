@@ -36,6 +36,7 @@ public static class ShopMenu
     static void Cosmetics(int pid)
     {
         Ui.Section("Kosmetik");
+            Console.WriteLine("  (SIMULASI: harga Rupiah hanya contoh, belum ada pembayaran sungguhan dan kas game tidak dipotong.)");
         foreach (var c in PlayerSvc.Shop(pid))
             Console.WriteLine($"  [{c.Id}] {c.Kind,-9} {c.Name,-34} Rp {c.PriceIdr,7:N0} {(c.Owned > 0 ? " (dimiliki)" : "")}");
 

@@ -28,7 +28,7 @@ public static class DriverMenu
                 case "3": Hire(pid); break;
                 case "4": Console.WriteLine(HrSvc.Refresh(pid, true)); break;
                 case "5": ShowStaff(pid); break;
-                case "6": ShowStaff(pid); Console.WriteLine(HrSvc.Raise(pid, Ui.Num("ID supir: "), Ui.Num("Naik %: ", 10))); break;
+                case "6": ShowStaff(pid); Console.WriteLine(HrSvc.Raise(pid, Ui.Num("ID supir: "), Ui.Num("Naik % (1-50) [10]: ", 10))); break;
                 case "7": ShowStaff(pid); Console.WriteLine(HrSvc.Fire(pid, Ui.Num("ID supir: "))); break;
                 case "0": return;
             }
@@ -58,7 +58,7 @@ public static class DriverMenu
         ShowCandidates(pid);
         Console.WriteLine();
         int id = Ui.Num("ID kandidat: ");
-        int offer = Ui.Num("Tawaran gaji % dari permintaan (80-130) [100]: ", 100);
+                int offer = Ui.Num("Tawaran gaji % dari permintaan (80-130) [100]: ", 100);
         Console.WriteLine(HrSvc.Hire(pid, id, offer));
     }
 

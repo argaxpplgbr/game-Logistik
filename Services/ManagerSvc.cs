@@ -18,7 +18,7 @@ public static class ManagerSvc
         foreach (var t in FleetSvc.Fleet(pid).Where(x => x.Status == "IDLE" && x.DriverId != null))
         {
             Plan? best = null; double bestProfit = double.MinValue;
-            foreach (var ct in contracts.Where(k => k.Status == "OPEN" || (k.Status == "ACTIVE" && k.TripsDoneMonth < k.TripsPerMonth)))
+                foreach (var ct in contracts.Where(k => (k.Kind == "SPOT" && k.Status == "OPEN") || (k.Kind == "DEDICATED" && k.Status == "ACTIVE")))
             {
                 var pl = TripSvc.Build(p, t.Id, ct.Id, p.MgrUjMult, 0, "DENDA", "AUTO", "ANTRE");
                 if (pl.Error != null) continue;

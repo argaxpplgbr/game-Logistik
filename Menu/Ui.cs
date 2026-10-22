@@ -9,7 +9,17 @@ public static class Ui
         return (Console.ReadLine() ?? "").Trim();
     }
 
-    public static int Num(string q, int def = -1) => int.TryParse(Ask(q), out var v) ? v : def;
+    // Kosong = nilai default. Teks bukan angka = diminta ulang (bukan diam-diam jadi default).
+    public static int Num(string q, int def = -1)
+    {
+        while (true)
+        {
+            var s = Ask(q);
+            if (s == "") return def;
+            if (int.TryParse(s, out var v)) return v;
+            Console.WriteLine("  Masukkan angka saja.");
+        }
+    }
 
     public static bool Yes(string q) => Ask(q).ToLower() == "y";
 
@@ -42,14 +52,20 @@ public static class Ui
         Console.WriteLine($"   0. {zero}");
     }
 
-    // Pertanyaan bergaya pilihan angka dengan nilai default
+    // Pertanyaan bergaya pilihan angka. Kosong = default; di luar daftar = diminta ulang.
     public static int Choose(string title, string[] opts, int def = 1)
     {
         Console.WriteLine();
         Console.WriteLine(title);
         for (int i = 0; i < opts.Length; i++)
             Console.WriteLine($"  {i + 1}. {opts[i]}");
-        return Num($"Pilih [{def}]: ", def);
+        while (true)
+        {
+            var s = Ask($"Pilih [{def}]: ");
+            if (s == "") return def;
+            if (int.TryParse(s, out var v) && v >= 1 && v <= opts.Length) return v;
+            Console.WriteLine($"  Pilihan harus angka 1-{opts.Length}.");
+        }
     }
 
     public static string Bar(int pct)

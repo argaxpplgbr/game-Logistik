@@ -22,12 +22,12 @@ public static class PlayerSvc
 
     public static int Day(Player p) => (int)((DateTime.UtcNow - p.CreatedAt).TotalMinutes / Rules.DayMinutes);
 
-    static string Spend(int id, long cost, string setSql, string ok)
+        static string Spend(int id, long cost, string setSql, string ok)
     {
-        var p = Get(id);
-        if (p.Cash < cost) return $"Uang kurang ({Rules.Rp(cost)}).";
-        using var c = Db.Open();
-        c.Execute($"UPDATE players SET cash=cash-@cost,{setSql} WHERE id=@id", new { cost, id });
+        using var c = Db.Open(); using var tx = c.BeginTransaction();
+        if (!Db.Spend(c, tx, id, cost)) return $"Uang kurang ({Rules.Rp(cost)}).";
+        c.Execute($"UPDATE players SET {setSql} WHERE id=@id", new { id }, tx);
+        tx.Commit();
         return ok;
     }
 
@@ -142,13 +142,14 @@ public static class PlayerSvc
         ("Dana Konglomerat", 500_000_000, 99000)
     };
 
-    public static string TopUp(int id, int idx)
+        public static string TopUp(int id, int idx)
     {
         if (idx < 0 || idx >= Packs.Length) return "Paket tidak ada.";
-        var pk = Packs[idx]; using var c = Db.Open();
+        var pk = Packs[idx]; using var c = Db.Open(); using var tx = c.BeginTransaction();
         c.Execute("INSERT INTO topups(player_id,pack,cash,price_idr,created_at) VALUES(@id,@n,@cash,@idr,@now)",
-            new { id, n = pk.name, cash = pk.cash, idr = pk.idr, now = DateTime.UtcNow });
-        c.Execute("UPDATE players SET cash=cash+@cash WHERE id=@id", new { cash = pk.cash, id });
+            new { id, n = pk.name, cash = pk.cash, idr = pk.idr, now = DateTime.UtcNow }, tx);
+        c.Execute("UPDATE players SET cash=cash+@cash WHERE id=@id", new { cash = pk.cash, id }, tx);
+        tx.Commit();
         return $"[SIMULASI bayar Rp {pk.idr:N0}] +{Rules.Rp(pk.cash)}. Ingat: rating/reputasi tidak bisa dibeli, kontrak kelas atas tetap terkunci.";
     }
 
@@ -164,7 +165,7 @@ public static class PlayerSvc
         var it = c.QueryFirstOrDefault<Cosmetic>("SELECT * FROM cosmetics WHERE id=@itemId", new { itemId });
         if (it == null) return "Item tidak ada.";
         c.Execute("INSERT IGNORE INTO owned_cosmetics(player_id,item_id) VALUES(@pid,@itemId)", new { pid, itemId });
-        return $"[SIMULASI bayar Rp {it.PriceIdr:N0}] {it.Name} dimiliki. Pasang lewat menu Armada.";
+                return $"[SIMULASI] {it.Name} dimiliki. Harga Rp {it.PriceIdr:N0} hanya contoh (belum ada pembayaran sungguhan), kas game tidak dipotong. Pasang lewat menu Armada.";
     }
 
     public static string Equip(int pid, int truckId, int itemId)

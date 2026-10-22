@@ -74,6 +74,32 @@ public static class ContractSvc
         }
     }
 
+        // Syarat armada minimum + peringatan kalau armada kamu sekarang belum sanggup
+    public static List<string> FleetCheck(int pid, Contract k)
+    {
+        var p = PlayerSvc.Get(pid); using var c = Db.Open();
+        var cg = c.QueryFirstOrDefault<CargoType>("SELECT * FROM cargo_types WHERE code=@x", new { x = k.CargoCode });
+        var res = new List<string>();
+        if (cg == null) return res;
+
+        res.Add($"Armada minimum: 1 truk dengan bak {cg.Bodies.Replace(",", "/")} yang muat >= {k.WeightKg:N0} kg, " +
+                $"1 supir ber-SIM sesuai truk, dan {k.TripsPerMonth} trip selesai tiap bulan.");
+        if (cg.B3 && !p.B3Cert) res.Add("PERINGATAN: kargo B3, kamu belum punya sertifikasi B3, trip akan ditolak.");
+
+        var bodies = cg.Bodies.Split(',');
+        var fit = FleetSvc.Fleet(pid).Where(t => bodies.Contains(t.BodyCode ?? "") && t.Payload >= k.WeightKg).ToList();
+        if (fit.Count == 0)
+            res.Add("PERINGATAN: kamu belum punya truk yang sanggup mengangkut kargo ini. Kalau diterima, target tidak tercapai = bayaran dipotong & reputasi turun.");
+        else
+        {
+            var staff = HrSvc.Staff(pid);
+            if (!fit.Any(t => staff.Any(d => Rules.SimRank(d.Sim) >= Rules.SimRank(t.Sim))))
+                res.Add("PERINGATAN: belum ada supir dengan SIM yang cukup untuk truk yang cocok.");
+            res.Add($"Truk yang cocok saat ini: {fit.Count}.");
+        }
+        return res;
+    }
+
     public static string Accept(int pid, int id)
     {
         var p = PlayerSvc.Get(pid); using var c = Db.Open();
@@ -81,7 +107,7 @@ public static class ContractSvc
         if (k == null) return "Kontrak tidak ada.";
         if (p.Reputation < k.RepRequired) return $"Reputasi kurang! Butuh {k.RepRequired}, kamu {p.Reputation}. Uang top-up tidak bisa membeli rating.";
         if (c.ExecuteScalar<int>("SELECT COUNT(*) FROM contracts WHERE player_id=@pid AND kind='DEDICATED' AND status='ACTIVE'", new { pid }) >= 4) return "Maksimal 4 kontrak borongan aktif.";
-        c.Execute("UPDATE contracts SET status='ACTIVE' WHERE id=@id", new { id });
+        if (c.Execute("UPDATE contracts SET status='ACTIVE' WHERE id=@id AND player_id=@pid AND status='OPEN'", new { id, pid }) != 1) return "Kontrak sudah tidak tersedia.";
         return $"Kontrak {k.Client} diterima: {k.TripsPerMonth} trip/bulan selama {k.MonthsTotal} bulan, bayar {Rules.Rp(k.MonthlyPay)}/bulan.";
     }
 }

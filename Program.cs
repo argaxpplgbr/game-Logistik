@@ -6,6 +6,13 @@ using Nusantara.Services;
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
+try {Db.EnsureMigrations(); }
+catch(Exception ex)
+{
+    Console.WriteLine("gagal terhubung ke database:" + ex.Message);
+    Console.WriteLine("Cek variabel NUSANTARA_DB_CONN (atau placeholder di database) dan pastikan MySql menyala");
+    return;
+}
 
 Console.Write("Nama perusahaan: ");
 var nm = (Console.ReadLine() ?? "").Trim();

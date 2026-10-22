@@ -39,7 +39,7 @@ public static class WorldSvc
             if (!active.Any(e => e.Code == t.code))
             {
                 c.Execute("INSERT INTO world_events(player_id,code,title,start_day,end_day,magnitude,cargos) VALUES(@pid,@code,@title,@s,@e,@mag,@cg)",
-                    new { pid, code = t.code, title = t.title, s = day, e = day + t.days, mag = t.mag, cg = t.cargos });
+                                new { pid, code = t.code, title = t.title, s = day, e = Rules.EventLastDay(day, t.days), mag = t.mag, cg = t.cargos });
                 if (t.cargos != "") ContractSvc.Refresh(pid, day, t.cargos.Split(','), 3);
             }
         }
@@ -56,7 +56,7 @@ public static class WorldSvc
         log.AddRange(TripSvc.CompleteTrips(pid));
         if (day > p.LastDay)
         {
-            for (int d = p.LastDay + 1; d <= day && d <= p.LastDay + 10; d++) Daily(pid, d);
+            for (int d = Math.Max(p.LastDay + 1, day - 9); d <= day; d++) Daily(pid, d);
             using var c = Db.Open();
             c.Execute("UPDATE players SET last_day=@day WHERE id=@pid", new { day, pid });
         }

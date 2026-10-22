@@ -72,6 +72,7 @@ public static class FleetMenu
 
     static void SetInsurance(int pid)
     {
+        Console.WriteLine("(polis dikunci per perjalanansaat truck berangkat, dan tidak bisa diganti selama truck jalan.)");
         int tid = Ui.Num("ID truk: ");
         int pick = Ui.Choose("Jenis asuransi:", new[] { "Tanpa asuransi", "TLO (Total Loss Only)", "All Risk" });
         string ins = pick switch { 2 => "TLO", 3 => "ALLRISK", _ => "NONE" };

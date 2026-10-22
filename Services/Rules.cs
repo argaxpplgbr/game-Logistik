@@ -59,4 +59,76 @@ public static class Rules
     }
 
     static int Cl(double v) => (int)Math.Max(0, Math.Round(v));
+
+    // =====================================================================
+    //  ATURAN MURNI (tanpa database) - dipakai service dan dites di Tests/
+    // =====================================================================
+
+    // ---- Gaji & rekrutmen ----
+    public const int MaxRaisePct = 50;
+
+    public static string? ValidateRaise(int pct) =>
+        pct <= 0 ? "Persentase kenaikan gaji harus lebih dari 0." :
+        pct > MaxRaisePct ? $"Kenaikan gaji maksimal {MaxRaisePct}% sekali naik." : null;
+
+    // Moral naik sebanding dengan kenaikan gaji (10% = +10), tidak pernah gratis.
+    public static int RaiseMorale(int pct) => Math.Clamp(pct, 0, 10);
+
+    public static long RaisedSalary(long salary, int pct) => salary * (100 + pct) / 100;
+
+    public static string? ValidateOffer(int pct) =>
+        pct < 80 ? "Tawaran gaji terlalu rendah, kandidat menolak." :
+        pct > 130 ? "Tawaran gaji maksimal 130% dari permintaan." : null;
+
+    // Jumlah supir dibatasi: sebanyak truk + 1 cadangan
+    public static int MaxDrivers(int trucks) => trucks + 1;
+
+    public static long Payroll(IEnumerable<long> salaries, int mechanics, bool manager, long arrears) =>
+        salaries.Sum(s => { long x = Math.Max(0, s); return x + (long)(x * 0.1024); })
+        + mechanics * 5_000_000L + (manager ? 15_000_000L : 0) + arrears;
+
+    // ---- Asuransi ----
+    public static long InsuranceClaim(bool total, long truckValue, long damage, long cargoLoss, string insurance, bool cargoIns)
+    {
+        bool tlo = insurance == "TLO", all = insurance == "ALLRISK";
+        long claim = 0;
+        if (total) { if (tlo || all) claim += (long)(truckValue * (tlo ? 0.8 : 0.9)); }
+        else if (damage > 0 && all) claim += (long)(damage * 0.9);
+        if (cargoLoss > 0 && cargoIns) claim += (long)(cargoLoss * 0.85);
+        return claim;
+    }
+
+    // ---- Kontrak ----
+    public static int DedicatedSlotsLeft(int tripsPerMonth, int doneThisMonth, int running) =>
+        Math.Max(0, tripsPerMonth - doneThisMonth - running);
+
+    public static long DedicatedPay(long monthlyPay, int tripsPerMonth, int tripsDone) =>
+        tripsDone >= tripsPerMonth ? monthlyPay : (long)(monthlyPay * 0.8 * tripsDone / Math.Max(1, tripsPerMonth));
+
+    // Bonus overload hanya ada di kontrak spot (borongan dibayar bulanan, fee per trip = 0)
+    public static bool OverloadAllowed(string contractKind) => contractKind == "SPOT";
+
+    public static long UjStd(long baseCost) => (long)(baseCost * 1.1);
+
+    // ---- Event & kebangkrutan ----
+    public static int EventLastDay(int startDay, int days) => startDay + Math.Max(1, days) - 1;
+
+    public static bool IsCashBankrupt(long cash) => cash < -100_000_000;
+
+    // ---- Peluang risiko (dipakai di rencana perjalanan DAN saat hasil dihitung) ----
+    public static double BrakeFailProb(int brakePct) => brakePct < 15 ? 0.35 : brakePct < 30 ? 0.03 : 0.003;
+
+    public static double SecMult(string sec) => sec == "ORMAS" ? 0.2 : sec == "RESTAREA" ? 0.4 : 1.0;
+
+    public static double TheftProb(int rawan, string sec, double moraleRisk) => rawan * 0.04 * SecMult(sec) * moraleRisk;
+
+    public static double WeighProb(bool razia, string policy) =>
+        0.45 * (razia ? 2.0 : 1.0) * (policy == "KAWAL" ? 0.3 : 1.0);
+
+    public static double AtLeastOne(IEnumerable<double> probs)
+    {
+        double none = 1;
+        foreach (var p in probs) none *= 1 - Math.Clamp(p, 0, 1);
+        return 1 - none;
+    }
 }
