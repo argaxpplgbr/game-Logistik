@@ -10,7 +10,7 @@ public static class Db
 {
    // JIKA PAKE XAMPP PASSOWRD KOSONGKAN 
     const string Placeholder =
-        "Server=localhost;Port=3306;Database=nusantara_logistics;User=root;Password=belajar123;";
+        "Server=localhost;Port=3306;Database=nusantara_logistics;User=root;Password=PASSWORD_MU;";
 
     public static readonly string ConnStr =
         Environment.GetEnvironmentVariable("NUSANTARA_DB_CONN") is { Length: > 0 } s ? s : Placeholder;
