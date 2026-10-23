@@ -16,6 +16,7 @@ public static class MainMenu
     {
         int day = PlayerSvc.Day(p);
         int trucks = FleetSvc.Fleet(pid).Count;
+        var fin = FinanceSvc.Preview(pid);
 
         Ui.Title("Nusantara Logistics Manager");
         Console.WriteLine($"  Perusahaan : {p.Name} ({p.Legal})");
@@ -23,12 +24,22 @@ public static class MainMenu
         Console.WriteLine($"  Kas        : {Rules.Rp(p.Cash)}");
         Console.WriteLine($"  Rating     : {p.Stars:0.0} bintang (reputasi {p.Reputation})");
         Console.WriteLine($"  Armada     : {trucks}/{FleetSvc.MaxTrucks(p.Tier)} truk");
+        Console.WriteLine($"  Tutup buku : hari {fin.NextDay} ({fin.DaysLeft} hari lagi), tagihan sekitar {Rules.Rp(fin.MinNeeded)}");
+        if (fin.NoIncome.EndCash < 0)
+            Console.WriteLine("  !! PERINGATAN: tanpa pemasukan baru, kas TIDAK cukup untuk tutup buku (menu 12).");
 
         var events = WorldSvc.Active(pid, day);
         if (events.Count > 0)
         {
             Ui.Section("BERITA AKTIF");
             foreach (var e in events) Console.WriteLine($"  [BERITA] {e.Title}");
+        }
+
+        var hint = TutorialSvc.Hint(pid);
+        if (hint != null)
+        {
+            Ui.Section("PANDUAN");
+            Console.WriteLine("  " + hint);
         }
 
         Ui.Options(new[]
@@ -42,7 +53,10 @@ public static class MainMenu
             "Berita & Sosmed",
             "Bank & Asuransi",
             "Pool / Tier / Manajer",
-            "Toko"
+            "Toko",
+            "Buku Kas & Laporan",
+            "Keuangan & Tutup Buku",
+            "Panduan Pemula"
         }, "Keluar");
     }
 }

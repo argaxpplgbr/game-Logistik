@@ -29,7 +29,7 @@ dotnet add package Dapper
 mkdir Database
 mkdir Models
 mkdir Services
-mkdir Menus
+mkdir Menu
 code .
 ```
 
@@ -37,9 +37,17 @@ Habis itu hapus `Program.cs` bawaan, lalu buat semua file sesuai daftar di bagia
 
 ### Database
 
-Database dan semua tabelnya dibuat langsung di MySQL Command Line Client, jadi di proyek ini tidak ada file SQL. Pastikan MySQL sudah nyala dan database bernama `nusantara_logistics` sudah ada.
+Impor `Database/schema.sql` sekali di database kosong lewat MySQL Command Line Client:
 
-Biar yakin tabelnya lengkap, cek di MySQL Command Line Client:
+```sql
+source Database/schema.sql;
+```
+
+Skrip ini tidak menghapus apa pun. Kalau tabelnya sudah ada, MySQL berhenti dengan error dan datamu aman.
+
+Untuk mengulang dari nol, jalankan `Database/reset.sql` (ini MENGHAPUS database), lalu impor `schema.sql` lagi.
+
+Cek hasilnya:
 
 ```sql
 USE nusantara_logistics;
@@ -48,20 +56,20 @@ SELECT COUNT(*) FROM truck_catalog;
 SELECT COUNT(*) FROM nodes;
 ```
 
-Harusnya ada 16 tabel, `truck_catalog` isinya 13 baris, dan `nodes` 28 baris. Kalau beda, berarti ada bagian yang belum masuk. Hapus databasenya (`DROP DATABASE nusantara_logistics;`) lalu buat ulang.
-
-Saran: simpan salinan SQL pembuat tabelnya di Notepad atau file lain di luar proyek, buat jaga-jaga kalau suatu saat mau reset.
+Harusnya ada 16 tabel, `truck_catalog` isinya 13 baris, dan `nodes` 28 baris. Tabel `ledger` (buku kas) dan kolom tutorial dibuat otomatis saat game pertama kali dijalankan, jadi setelah itu totalnya 17 tabel.
 
 ### Samakan password MySQL
 
 Buka `Database/Db.cs` dan cari baris ini:
 
 ```csharp
-public const string ConnStr =
-    "Server=localhost;Port=3306;Database=nusantara_logistics;User=root;Password=;";
+const string Placeholder =
+    "Server=localhost;Port=3306;Database=nusantara_logistics;User=root;Password=PASSWORD_MU;";
 ```
 
-Isi `Password=` dengan password yang kamu pakai waktu login di MySQL Command Line Client. Kalau MySQL kamu memang tidak pakai password, biarkan kosong.
+Ganti `PASSWORD_MU` dengan password yang kamu pakai waktu login di MySQL Command Line Client. Kalau MySQL kamu memang tidak pakai password (misalnya XAMPP), kosongkan saja jadi `Password=;`.
+
+Alternatif tanpa edit kode: isi variabel lingkungan `NUSANTARA_DB_CONN` dengan connection string lengkap.
 
 ## Menjalankan
 
@@ -72,42 +80,56 @@ dotnet run
 
 Game akan nanya nama perusahaan. Pakai nama baru untuk mulai baru, pakai nama lama untuk lanjut progres sebelumnya.
 
+Untuk menjalankan tes aturan game:
+
+```
+dotnet test Tests/Nusantara.Tests.csproj
+```
+
 ## Cara main (buat yang baru mulai)
+
+Di menu utama ada **Panduan Pemula** (menu 13) dan kotak PANDUAN yang menunjukkan langkah berikutnya. Selesaikan 6 langkahnya untuk hadiah Rp 5 juta (satu kali saja). Tutorial tidak mengunci menu lain dan boleh dilewati.
 
 Urutan yang aku sarankan untuk menit-menit pertama:
 
 1. Beli truk dulu di menu Dealer, pilih Truk baru. Ambil Grand Maxx Pick-Up atau Blind Van, karena baknya sudah terpasang dan langsung bisa jalan.
 2. Cari supir di menu Supir. Lihat CV, lalu interview orang yang kamu taksir (Rp 100.000). Ini penting, soalnya kejujuran di CV sering dilebihkan dan interview menunjukkan angka aslinya. Tier 1 cukup SIM A.
 3. Pasang supirnya ke truk lewat menu Armada.
-4. Buka menu Kontrak & Berangkat, pilih kontrak, pilih truk, atur uang jalan, lalu berangkat.
+4. Buka menu Kontrak & Berangkat. Pilih filter "layak", baca preview biaya dan laba, pilih kontrak, pilih truk, atur uang jalan, lalu berangkat.
 5. Tunggu sampai tiba. Hasilnya muncul sendiri waktu kamu balik ke menu utama. Kalau penasaran sisa waktunya, lihat menu Perjalanan.
-6. Jangan lupa servis. Jangan tunggu sampai kanvas rem di bawah 15%, itu awal dari masalah.
-7. Kalau reputasi sudah 50, naik jadi CV lewat menu Pool / Tier / Manajer.
+6. Buka menu Perjalanan, ketik ID trip yang selesai untuk melihat laporan laba/rugi. Setiap rupiah yang masuk dan keluar tercatat di sana.
+7. Jangan lupa servis. Jangan tunggu sampai kanvas rem di bawah 15%, itu awal dari masalah.
+8. Kalau reputasi sudah 50, naik jadi CV lewat menu Pool / Tier / Manajer.
 
-Beberapa tips: kasih uang jalan standar atau lebih supaya supir tidak ngambek, jangan beli truk bekas di awal karena komponennya sudah hampir habis, dan kalau ada kontrak yang minta reputasi tinggi, lewati dulu.
+Beberapa tips: kasih uang jalan standar atau lebih supaya supir tidak ngambek, jangan beli truk bekas di awal karena komponennya sudah hampir habis, dan kalau ada kontrak yang minta reputasi tinggi, lewati dulu. Cek menu Keuangan & Tutup Buku sebelum menambah staf atau mengambil utang.
 
 ## Isi menu
 
-Menu utama ada 10 pilihan. Setiap submenu bakal terus muncul sampai kamu pilih 0 untuk kembali.
+Menu utama ada 13 pilihan. Setiap submenu bakal terus muncul sampai kamu pilih 0 untuk kembali.
 
 1. **Armada**: lihat kondisi truk, pasang supir, ganti jenis BBM, atur asuransi, pasang kosmetik.
 2. **Dealer**: beli truk baru, lihat pasar truk bekas, dan karoseri untuk pasang bak.
 3. **Servis**: ganti oli, kanvas rem, ban, filter, dan mesin.
 4. **Supir**: lihat CV, interview, rekrut, naikkan gaji, pecat.
-5. **Kontrak & Berangkat**: pilih kontrak lalu atur semua detail perjalanan.
-6. **Perjalanan**: truk yang lagi jalan dan lima hasil terakhir.
+5. **Kontrak & Berangkat**: papan kontrak dengan filter dan tanda LAYAK / BELUM LAYAK, preview laba, lalu atur semua detail perjalanan.
+6. **Perjalanan**: truk yang lagi jalan, lima hasil terakhir, dan laporan laba/rugi per trip.
 7. **Berita & Sosmed**: running news dan kampanye marketing buat naikin reputasi brand.
 8. **Bank & Asuransi**: pinjam dan lunasi uang bank.
 9. **Pool / Tier / Manajer**: naik jadi CV atau PT, pool, depo solar, gudang sparepart, mekanik, sertifikat B3, manajer.
 10. **Toko**: top-up kas, kosmetik, dan hadiah dari nonton iklan.
+11. **Buku Kas & Laporan**: riwayat semua transaksi, filter kategori, ringkasan masuk/keluar, dan cek rekonsiliasi.
+12. **Keuangan & Tutup Buku**: kas tersedia, tagihan bulan depan, saldo minimum yang perlu dijaga, dan proyeksi 7/30 hari.
+13. **Panduan Pemula**: tutorial 6 langkah.
 
-Waktu mau berangkat, kamu bakal ditanya beberapa hal:
+Waktu mau berangkat, kamu bakal ditanya beberapa hal (dan sebelum memilih, dampak tiap pilihan UJ dan overload ditampilkan dulu):
 
 - **Uang jalan**: pas-pasan (0.9x), standar (1.0x), longgar (1.15x), atau sangat longgar (1.3x). Kalau kurang dari yang diminta supir, moralnya turun.
 - **Overload**: 0, 20, atau 40 persen. Untungnya lebih gede tapi bisa kena timbangan.
 - **Kalau kena timbangan**: bayar denda, pakai jasa pengawalan, atau bongkar muatan.
 - **Keamanan**: tanpa pengamanan, bayar uang keamanan Ormas, atau wajib istirahat di rest area.
 - **Kalau solar langka**: antre di SPBU (lebih lama) atau beli eceran (lebih mahal).
+
+Sebelum benar-benar berangkat, game menghitung ulang semua syarat. Kalau biaya berubah sejak preview (harga, event, atau kondisi), keberangkatan dibatalkan tanpa memotong uang, dan kamu tinggal bikin preview baru.
 
 ## Aturan mainnya
 
@@ -129,7 +151,7 @@ Bawaannya aku set dipercepat 20 kali supaya enak dicoba. Kalau mau waktu asli, l
 
 ### Uang jalan (UJ)
 
-UJ standar dihitung dari BBM, tol, tiket kapal, uang makan dan parkir, dan cadangan buat jalur rawan, lalu dikali 1,1. Kalau UJ lebih besar dari biaya aslinya, sisanya dikembalikan supir sesuai tingkat kejujurannya. Kalau kurang, supir nombok dulu dan moralnya turun.
+UJ standar dihitung dari BBM, tol, tiket kapal, uang makan dan parkir, dan cadangan buat jalur rawan, lalu dikali 1,1. UJ dipotong dari kas **sekali saja** waktu berangkat. Waktu trip selesai, kalau UJ lebih besar dari biaya aslinya, sisanya dikembalikan supir sesuai tingkat kejujurannya. Kalau kurang, supir nombok dulu dan moralnya turun, lalu perusahaan menggantinya.
 
 ### BBM
 
@@ -145,7 +167,7 @@ Servis pakai mekanik panggilan itu mahal. Mekanik tetap lebih hemat, tapi butuh 
 
 SIM A untuk Tier 1, B1 untuk Tier 2, B2 Umum untuk Tier 3. SIM yang lebih tinggi boleh bawa truk yang lebih kecil. Atribut yang perlu diperhatikan: kecepatan, eco-driving, kejujuran, pengalaman, dan riwayat nabrak.
 
-Biaya per supir itu gaji pokok, BPJS (sekitar 10 persen dari gaji), uang jalan tiap trip, dan komisi. Soal moral:
+Biaya per supir itu gaji pokok, BPJS (sekitar 10 persen dari gaji), uang jalan tiap trip, dan komisi. Jumlah supir dibatasi sebanyak truk ditambah 1 cadangan. Soal moral:
 
 - Moral 70 ke atas: lebih cepat, BBM irit, truk lebih awet, risiko lebih kecil.
 - Moral di bawah 30: ugal-ugalan, jual BBM di jalan, bahkan bisa kabur bawa kargo.
@@ -153,7 +175,11 @@ Biaya per supir itu gaji pokok, BPJS (sekitar 10 persen dari gaji), uang jalan t
 
 ### Kontrak
 
-Ada dua jenis. Spot charter itu sekali jalan, bayarannya per kilometer tinggi, tapi jumlahnya tidak menentu dan cepat kedaluwarsa. Kontrak borongan itu bulanan (1 sampai 12 bulan) dari pabrik atau BUMN. Margin sedang, tapi pemasukannya pasti. Kalau target trip per bulan tidak tercapai, bayaran dipotong dan reputasi turun.
+Ada dua jenis. Spot charter itu sekali jalan, bayarannya per kilometer tinggi, tapi jumlahnya tidak menentu dan cepat kedaluwarsa. Kontrak borongan itu bulanan (1 sampai 12 bulan) dari pabrik atau BUMN. Margin sedang, tapi pemasukannya pasti.
+
+Aturan payout borongan: kalau target trip per bulan tercapai, kamu dibayar penuh. Kalau kurang, bayarannya jadi 80% x bayaran bulanan x (trip selesai / target), dan reputasi turun 5. Trip yang masih berjalan saat tutup buku **tidak** dihitung untuk target. Tabel bayarannya ditampilkan di preview sebelum kamu menerima kontrak.
+
+Setiap kontrak di papan diberi tanda **LAYAK** (ada truk, supir, bak, dan SIM yang cocok, plus estimasi laba) atau **BELUM LAYAK** (dengan alasannya). Estimasi laba memakai asumsi UJ standar, tanpa overload, dan tanpa kejadian acak.
 
 Kontrak borongan ada syarat reputasinya. Uang top-up tidak bisa membeli reputasi, itu sengaja.
 
@@ -175,7 +201,19 @@ Kalau cicilan telat dua kali, bank menyita truk termahalmu. Telat tiga kali, ata
 
 Asuransi diatur per truk lewat menu Armada. All Risk menanggung sekitar 90 persen kerusakan, TLO sekitar 80 persen nilai truk kalau total loss, dan Cargo Insurance sekitar 85 persen kerugian kargo. Setiap klaim bikin premi bulan depan naik, dan pelan-pelan turun lagi kalau tidak ada klaim.
 
-Tiap 30 hari game ada tutup buku otomatis: terima bayaran borongan, bayar gaji, BPJS, sewa pool, premi, dan cicilan.
+### Tutup buku bulanan
+
+Tiap 30 hari game ada tutup buku otomatis dengan urutan: terima bayaran borongan, bayar gaji dan BPJS, sewa pool, premi, lalu cicilan bank. Kalau kas tidak cukup untuk gaji, seluruh tagihan gaji jadi tunggakan yang ditagih lagi bulan depan, moral supir turun, dan sebagian bisa resign.
+
+Satu bulan hanya diproses satu kali. Kalau proses gagal di tengah, tidak ada yang berubah dan tanggal tutup buku tidak maju.
+
+Buka menu **Keuangan & Tutup Buku** untuk melihat tagihan berikutnya, saldo minimum yang perlu dijaga, dan jawaban cepat untuk pertanyaan "kalau tidak ada pemasukan sampai tutup buku, kas cukup atau tidak?". Piutang borongan dan UJ yang sedang di jalan **tidak** dianggap uang tunai.
+
+### Buku kas
+
+Setiap perubahan kas punya satu baris di buku kas (menu 11): tanggal, kategori, nominal masuk/keluar, saldo sesudahnya, dan tautan ke trip kalau ada. Menjumlahkan seluruh buku kas harus sama dengan kas perusahaan. Cek di menu 11 pilihan "Cek rekonsiliasi". Kalau hasilnya SELISIH, berarti ada perubahan kas di luar buku kas dan itu bug yang perlu dilaporkan.
+
+Trip dari sebelum buku kas dibuat tidak punya rincian, jadi laporannya menampilkan "belum ada catatan", bukan angka nol karangan.
 
 ### Fasilitas
 
@@ -198,48 +236,61 @@ Semua di sini cuma simulasi, tidak ada uang sungguhan yang keluar. Top-up nambah
 
 ```
 NusantaraLogistics/
-├─ NusantaraLogistics.csproj
+├─ GameLogistics.csproj
 ├─ Program.cs                 loop menu utama
-├─ README.md
-├─ Menus/                     tampilan dan input
+├─ Readme.md
+├─ Menu/                      tampilan dan input
 │  ├─ Ui.cs                   fungsi bantu (input, garis, bar komponen)
 │  ├─ MainMenu.cs             dashboard
 │  ├─ FleetMenu.cs
-│  ├─ DealerMenu.cs
+│  ├─ DelarMenu.cs
 │  ├─ ServiceMenu.cs
 │  ├─ DriverMenu.cs
-│  ├─ ContractMenu.cs
-│  ├─ TripMenu.cs
+│  ├─ ContractMenu.cs         papan kontrak, preview, perencana berangkat
+│  ├─ TripMenu.cs             perjalanan + laporan laba/rugi trip
 │  ├─ NewsMenu.cs
 │  ├─ BankMenu.cs
-│  ├─ FacilityMenu.cs
-│  └─ ShopMenu.cs
+│  ├─ FacilitasMenu.cs
+│  ├─ ShopMenu.cs
+│  ├─ LedgerMenu.cs           buku kas
+│  ├─ FinanceMenu.cs          arus kas, proyeksi, tutup buku
+│  └─ TutorialMenu.cs         panduan pemula
 ├─ Services/                  logika dan aturan game
 │  ├─ Rules.cs
+│  ├─ Accounting.cs           rumus uang v3 (tutup buku, UJ, margin)
 │  ├─ RoadGraph.cs
-│  ├─ PlayerSvc.cs
-│  ├─ FleetSvc.cs
+│  ├─ Playersvc.cs
+│  ├─ FlettSvc.cs
 │  ├─ HrSvc.cs
 │  ├─ ContractSvc.cs
+│  ├─ ContractPreview.cs      kelayakan kontrak + estimasi laba
 │  ├─ TripSvc.cs
 │  ├─ FinanceSvc.cs
+│  ├─ LedgerSvc.cs            buku kas
+│  ├─ TutorialSvc.cs
 │  ├─ WorldSvc.cs
 │  └─ ManagerSvc.cs
 ├─ Models/
-│  └─ Models.cs
-└─ Database/
-   └─ Db.cs                   koneksi MySQL
+│  └─ models.cs
+├─ Database/
+│  ├─ Db.cs                   koneksi MySQL, pencatatan kas, migrasi otomatis
+│  ├─ schema.sql              pembuat tabel (aman, tidak menghapus)
+│  └─ reset.sql               hapus database (hanya kalau sengaja)
+└─ Tests/
+   ├─ Nusantara.Tests.csproj
+   ├─ RulesTests.cs
+   └─ V3Tests.cs
 ```
 
-Pembagiannya begini: folder `Menus` cuma urusan nampilin dan nanya ke pemain, sedangkan semua hitungan dan aturan ada di `Services`.
+Pembagiannya begini: folder `Menu` cuma urusan nampilin dan nanya ke pemain, sedangkan semua hitungan dan aturan ada di `Services`.
 
 ## Mau ubah sesuatu, edit di mana?
 
-Teks menu atau urutan pertanyaan ada di folder `Menus`, file menu yang bersangkutan. Bar komponen dan garis ada di `Menus/Ui.cs`.
+Teks menu atau urutan pertanyaan ada di folder `Menu`, file menu yang bersangkutan. Bar komponen dan garis ada di `Menu/Ui.cs`.
 
-Harga BBM, rumus konsumsi, dan kecepatan waktu ada di `Services/Rules.cs`. Biaya fasilitas, syarat naik tier, kampanye, dan paket top-up ada di `Services/PlayerSvc.cs`. Urusan truk, servis, dan karoseri ada di `Services/FleetSvc.cs`. Supir ada di `HrSvc.cs`, pembuatan kontrak di `ContractSvc.cs`.
+Harga BBM, rumus konsumsi, dan kecepatan waktu ada di `Services/Rules.cs`. Rumus tutup buku, margin, dan hadiah tutorial ada di `Services/Accounting.cs`. Biaya fasilitas, syarat naik tier, kampanye, dan paket top-up ada di `Services/Playersvc.cs`. Urusan truk, servis, dan karoseri ada di `Services/FlettSvc.cs`. Supir ada di `HrSvc.cs`, pembuatan kontrak di `ContractSvc.cs`, dan kelayakan kontrak di `ContractPreview.cs`.
 
-Peluang kecelakaan, tilang, pungli, dan hasil akhir perjalanan ada di `Services/TripSvc.cs`. Gaji, cicilan, bunga, penyitaan, dan kebangkrutan ada di `FinanceSvc.cs`. Jenis berita ada di `WorldSvc.cs`, dan perilaku manajer otomatis di `ManagerSvc.cs`.
+Peluang kecelakaan, tilang, pungli, dan hasil akhir perjalanan ada di `Services/TripSvc.cs`. Gaji, cicilan, bunga, penyitaan, tutup buku, dan kebangkrutan ada di `FinanceSvc.cs`. Pencatatan buku kas ada di `LedgerSvc.cs` dan `Database/Db.cs`. Jenis berita ada di `WorldSvc.cs`, dan perilaku manajer otomatis di `ManagerSvc.cs`.
 
 Daftar truk, bak, kargo, kota, jalan, dan kosmetik tersimpan di tabel MySQL (misalnya `truck_catalog`, `cargo_types`, `nodes`, `edges`, `cosmetics`). Kalau mau ubah harga atau tambah data, ubah langsung di MySQL Command Line Client pakai perintah `UPDATE` atau `INSERT`.
 
@@ -269,13 +320,14 @@ TRUNCATE TABLE world_events;
 TRUNCATE TABLE loans;
 TRUNCATE TABLE owned_cosmetics;
 TRUNCATE TABLE topups;
+TRUNCATE TABLE ledger;
 TRUNCATE TABLE players;
 SET FOREIGN_KEY_CHECKS = 1;
 ```
 
 Perintah ini tidak menyentuh daftar truk, kargo, kota, jalan, dan kosmetik, jadi data bawaan game tetap aman.
 
-Kalau mau hapus semuanya termasuk tabel, pakai `DROP DATABASE nusantara_logistics;` lalu buat ulang dari SQL yang kamu simpan.
+Kalau mau hapus semuanya termasuk tabel, jalankan `Database/reset.sql` (isinya `DROP DATABASE nusantara_logistics;`) lalu impor ulang `Database/schema.sql`.
 
 ## Kalau ada error
 
@@ -283,15 +335,21 @@ Kalau mau hapus semuanya termasuk tabel, pakai `DROP DATABASE nusantara_logistic
 
 **Unable to connect to any of the specified MySQL hosts**: MySQL belum nyala. Start dulu service MySQL-nya.
 
-**Unknown database 'nusantara_logistics'**: database belum dibuat atau namanya beda. Cek lagi di MySQL Command Line Client dengan `SHOW DATABASES;`.
+**Unknown database 'nusantara_logistics'**: database belum dibuat atau namanya beda. Cek lagi di MySQL Command Line Client dengan `SHOW DATABASES;`, atau impor `Database/schema.sql`.
 
-**Table ... doesn't exist**: ada tabel yang belum terbuat. Cek dengan `SHOW TABLES;` dan bandingkan dengan 16 tabel yang seharusnya ada.
+**Table ... doesn't exist**: ada tabel yang belum terbuat. Cek dengan `SHOW TABLES;` dan bandingkan dengan 17 tabel yang seharusnya ada (16 dari schema.sql + `ledger` yang dibuat otomatis saat game dijalankan).
+
+**Table ... already exists saat impor schema.sql**: tabelnya sudah ada, dan itu sengaja tidak ditimpa. Pakai `Database/reset.sql` kalau memang mau mengulang dari nol.
 
 **Error merah CS0103 atau CS0246 di VS Code**: biasanya ada file yang belum dibuat, salah folder, atau lupa baris `using` di atas file.
 
 **The type or namespace 'Dapper' could not be found**: package belum terpasang. Jalankan `dotnet add package Dapper`, lalu `dotnet restore`.
 
-**Truk tidak bisa berangkat**: biasanya belum ada supir, bak tidak cocok dengan kargo, SIM supir kurang, atau muatan melebihi kapasitas. Pesan yang muncul di layar biasanya sudah menyebut penyebabnya.
+**Truk tidak bisa berangkat**: biasanya belum ada supir, bak tidak cocok dengan kargo, SIM supir kurang, atau muatan melebihi kapasitas. Pesan yang muncul di layar biasanya sudah menyebut penyebabnya, dan papan kontrak menandai alasan BELUM LAYAK.
+
+**Biaya berubah sejak preview**: harga, event, atau kondisi berubah antara preview dan konfirmasi. Tidak ada uang yang dipotong. Buat preview baru.
+
+**Rekonsiliasi buku kas menunjukkan SELISIH**: ada perubahan kas yang tidak tercatat. Catat langkah terakhir yang kamu lakukan dan laporkan.
 
 **Tulisan atau simbol berantakan**: terminalnya tidak pakai UTF-8. Pakai terminal bawaan VS Code atau Windows Terminal.
 
@@ -304,9 +362,12 @@ Kalau error-nya tidak ada di daftar ini, salin teks lengkapnya beserta nama file
 - Top-up, kosmetik, dan iklan itu simulasi. Tidak ada transaksi uang sungguhan. Tabel `topups` cuma mencatat riwayat simulasinya.
 - Data tersimpan per nama perusahaan di MySQL. Menutup game tidak menghapus progres, dan perjalanan truk tetap jalan sesuai waktu asli.
 - Angka dan harga di game itu desain permainan, bukan data logistik sebenarnya.
+- Angka ekonomi (tarif, biaya, hadiah) adalah sasaran desain untuk diuji lewat playtest, bukan klaim realistis.
 
 ## Rencana ke depan
 
+- Jadwal servis dan kondisi armada, perkembangan supir (moral, pelatihan), dan insiden yang bisa dipulihkan di tengah perjalanan.
+- Save/backup/restore, laporan statistik, pencapaian, dan mode kesulitan.
 - Tampilan yang lebih menarik (GUI atau game engine).
 - Pembayaran dan iklan sungguhan.
 - Simpan data online biar bisa main dari perangkat lain.

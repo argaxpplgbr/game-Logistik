@@ -1,5 +1,4 @@
-DROP DATABASE IF EXISTS nusantara_logistics;
-CREATE DATABASE nusantara_logistics CHARACTER SET utf8mb4;
+CREATE DATABASE IF NOT EXISTS nusantara_logistics CHARACTER SET utf8mb4;
 USE nusantara_logistics;
 
 CREATE TABLE players (

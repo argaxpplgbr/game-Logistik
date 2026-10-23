@@ -8,55 +8,77 @@ public static class ContractMenu
     public static void Run(int pid)
     {
         var p = PlayerSvc.Get(pid);
-        var list = ContractSvc.Open(pid);
+        var all = ContractSvc.Open(pid);
 
         Ui.Title("Kontrak & Berangkat");
-        ShowContracts(list);
-        if (list.Count == 0) { Ui.Empty("Belum ada kontrak tersedia."); Ui.Pause(); return; }
+        if (all.Count == 0) { Ui.Empty("Belum ada kontrak tersedia."); Ui.Pause(); return; }
+
+        int f = Ui.Choose("Filter papan kontrak:",
+            new[] { "Semua", "Hanya yang layak dijalankan sekarang", "Spot charter saja", "Borongan saja" }, 1);
+        Console.WriteLine("\n(Menghitung kelayakan tiap kontrak...)");
+        var rows = all.Select(k => (k, fz: ContractPreview.Evaluate(p, k))).ToList();
+        if (f == 2) rows = rows.Where(r => r.fz.Ok).ToList();
+        else if (f == 3) rows = rows.Where(r => r.k.Kind == "SPOT").ToList();
+        else if (f == 4) rows = rows.Where(r => r.k.Kind == "DEDICATED").ToList();
+
+        if (rows.Count == 0) { Ui.Empty("Tidak ada kontrak yang cocok dengan filter."); Ui.Pause(); return; }
+        ShowBoard(rows);
 
         Console.WriteLine();
         int id = Ui.Num("ID kontrak (0=batal): ");
         if (id <= 0) return;
 
-        var ct = list.FirstOrDefault(x => x.Id == id);
-        if (ct == null) { Console.WriteLine("Kontrak tidak ada."); Ui.Pause(); return; }
+        var row = rows.FirstOrDefault(x => x.k.Id == id);
+        if (row.k == null) { Console.WriteLine("Kontrak tidak ada di daftar yang tampil."); Ui.Pause(); return; }
+        var ct = row.k; var fz = row.fz;
+
+        ShowPreview(ct, fz);
 
         if (ct.Kind == "DEDICATED" && ct.Status == "OPEN")
         {
             Ui.Section("Armada yang dibutuhkan kontrak ini");
             foreach (var w in ContractSvc.FleetCheck(pid, ct)) Console.WriteLine("  " + w);
 
-            if (Ui.Yes("\nTerima kontrak borongan ini? (y/n): "))
+            string q = fz.Ok ? "\nTerima kontrak borongan ini? (y/n): "
+                             : "\nKontrak ini BELUM layak untuk armadamu. Tetap terima dan tanggung risiko potongan? (y/n): ";
+            if (Ui.Yes(q))
                 Console.WriteLine(ContractSvc.Accept(pid, id));
             Ui.Pause();
             return;
         }
 
-        Dispatch(pid, p, ct);
+        if (!fz.Ok)
+        {
+            Console.WriteLine("\nKontrak ini belum bisa dijalankan sekarang, lihat alasan di atas.");
+            Ui.Pause();
+            return;
+        }
+
+        Dispatch(pid, ct);
         Ui.Pause();
     }
 
-    static void ShowContracts(List<Contract> list)
+    static void ShowBoard(List<(Contract k, Feasibility fz)> rows)
     {
         Ui.Section("Kontrak Eceran (Spot Charter)");
-        var spot = list.Where(k => k.Kind == "SPOT").ToList();
+        var spot = rows.Where(r => r.k.Kind == "SPOT").ToList();
         if (spot.Count == 0) Ui.Empty("Tidak ada.");
-        foreach (var k in spot)
+        foreach (var (k, fz) in spot)
         {
             Console.WriteLine();
-            Console.WriteLine($"[{k.Id}] {k.Origin} -> {k.Dest}");
+            Console.WriteLine($"[{k.Id}] {k.Origin} -> {k.Dest}   {Flag(fz)}");
             Console.WriteLine($"     Kargo   : {k.CargoCode}, {k.WeightKg:N0} kg");
             Console.WriteLine($"     Bayaran : {Rules.Rp(k.Fee)} sekali jalan");
             Console.WriteLine($"     Syarat  : reputasi >= {k.RepRequired}   (status {k.Status})");
         }
 
         Ui.Section("Kontrak Borongan (Dedicated Freight)");
-        var ded = list.Where(k => k.Kind == "DEDICATED").ToList();
+        var ded = rows.Where(r => r.k.Kind == "DEDICATED").ToList();
         if (ded.Count == 0) Ui.Empty("Tidak ada.");
-        foreach (var k in ded)
+        foreach (var (k, fz) in ded)
         {
             Console.WriteLine();
-            Console.WriteLine($"[{k.Id}] {k.Client}: {k.Origin} -> {k.Dest}");
+            Console.WriteLine($"[{k.Id}] {k.Client}: {k.Origin} -> {k.Dest}   {Flag(fz)}");
             Console.WriteLine($"     Kargo   : {k.CargoCode}, {k.WeightKg:N0} kg per trip");
             Console.WriteLine($"     Bayaran : {Rules.Rp(k.MonthlyPay)} per bulan");
             Console.WriteLine($"     Target  : {k.TripsPerMonth} trip/bulan selama {k.MonthsTotal} bulan ({k.TripsDoneMonth} trip bulan ini)");
@@ -64,8 +86,72 @@ public static class ContractMenu
         }
     }
 
-    static void Dispatch(int pid, Player p, Contract ct)
+    static string Flag(Feasibility fz) =>
+        fz.Ok ? (fz.Best != null ? $"[LAYAK, laba ~{Rules.Rp(fz.Best.NetOk)}]" : "[LAYAK]") : "[BELUM LAYAK]";
+
+    static void ShowPreview(Contract k, Feasibility fz)
     {
+        Ui.Section($"Preview kontrak [{k.Id}]");
+        Console.WriteLine($"  Status kelayakan : {(fz.Ok ? "LAYAK dijalankan dengan kondisi sekarang" : "BELUM LAYAK")}");
+        foreach (var r in fz.Reasons) Console.WriteLine("  - " + r);
+
+        if (fz.Best != null)
+        {
+            var b = fz.Best;
+            Console.WriteLine($"  Truk terbaik     : [{b.Truck.Id}] {b.Truck.ModelName}, supir {b.Driver.Name} ({fz.FitTrucks} truk cocok)");
+            if (k.Kind == "SPOT")
+            {
+                Console.WriteLine($"  Pendapatan kotor : {Rules.Rp(b.IncomeEst)}");
+                Console.WriteLine($"  Komisi supir     : {Rules.Rp(b.CommissionEst)}");
+                Console.WriteLine($"  UJ diberikan     : {Rules.Rp(b.UjGiven)}   (biaya wajib perkiraan {Rules.Rp(b.CostEst)})");
+                Console.WriteLine($"  Estimasi bersih  : {Rules.Rp(b.NetOk)}   (margin {Accounting.Margin(b.NetOk, b.IncomeEst):P0})");
+            }
+            else
+            {
+                Console.WriteLine($"  Pendapatan       : setara {Rules.Rp(b.MonthlyShare)} per trip (cair bulanan)");
+                Console.WriteLine($"  Biaya per trip   : UJ {Rules.Rp(b.UjGiven)}, biaya wajib perkiraan {Rules.Rp(b.CostEst)}");
+            }
+            Console.WriteLine("  Asumsi           : UJ standar, tanpa overload, tanpa kejadian acak (pungli, mogok, kecelakaan).");
+        }
+
+        if (k.Kind == "DEDICATED")
+        {
+            Ui.Section("Tabel bayaran borongan");
+            Console.WriteLine($"  Target {k.TripsPerMonth} trip/bulan, bayaran penuh {Rules.Rp(k.MonthlyPay)}/bulan, {k.MonthsTotal} bulan.");
+            for (int d = k.TripsPerMonth - 1; d >= Math.Max(0, k.TripsPerMonth - 3); d--)
+                Console.WriteLine("  Jika " + Accounting.DedicatedFormula(k.MonthlyPay, k.TripsPerMonth, d));
+            Console.WriteLine("  Trip yang masih berjalan saat tutup buku tidak dihitung untuk target.");
+        }
+    }
+
+    // Tampilkan dampak tiap pilihan SEBELUM pemain memilih
+    static bool ShowImpact(Player p, int tid, Contract ct)
+    {
+        Ui.Section("Dampak pilihan Uang Jalan (tanpa overload)");
+        foreach (var (m, label) in new[] { (0.9, "Pas-pasan 0.9x"), (1.0, "Standar 1.0x"), (1.15, "Longgar 1.15x"), (1.3, "Sangat longgar 1.3x") })
+        {
+            var x = TripSvc.Build(p, tid, ct.Id, m, 0, "DENDA", "AUTO", "ANTRE");
+            if (x.Error != null) { Console.WriteLine("\n" + x.Error); return false; }
+            string warn = x.UjGiven < x.CostEst ? "  <- UJ di bawah biaya wajib, supir nombok" : "";
+            Console.WriteLine($"  {label,-18} UJ {Rules.Rp(x.UjGiven),16}   bersih jika lancar {Rules.Rp(x.NetOk),16}{warn}");
+        }
+
+        if (ct.Kind == "SPOT")
+        {
+            Ui.Section("Dampak pilihan overload (UJ standar)");
+            foreach (var ol in new[] { 0, 20, 40 })
+            {
+                var x = TripSvc.Build(p, tid, ct.Id, 1.0, ol, "DENDA", "AUTO", "ANTRE");
+                if (x.Error != null) { Console.WriteLine($"  Overload {ol,2}%: tidak bisa ({x.Error})"); continue; }
+                Console.WriteLine($"  Overload {ol,2}%  pendapatan {Rules.Rp(x.IncomeEst),16}   bersih {Rules.Rp(x.NetOk),16}   kena timbangan {x.PTilang:P0}");
+            }
+        }
+        return true;
+    }
+
+    static void Dispatch(int pid, Contract ct)
+    {
+        var p = PlayerSvc.Get(pid);
         Ui.Section("Truk yang siap jalan");
         var idle = FleetSvc.Fleet(pid).Where(x => x.Status == "IDLE").ToList();
         if (idle.Count == 0) { Ui.Empty("Tidak ada truk IDLE."); return; }
@@ -74,6 +160,8 @@ public static class ContractMenu
 
         Console.WriteLine();
         int tid = Ui.Num("ID truk: ");
+        if (!idle.Any(x => x.Id == tid)) { Console.WriteLine("\nTruk itu tidak ada di daftar yang siap jalan."); return; }
+        if (!ShowImpact(p, tid, ct)) return;
 
         int u = Ui.Choose("Uang Jalan (UJ):",
             new[] { "Pas-pasan (0.9x)", "Standar (1.0x)", "Longgar (1.15x)", "Sangat longgar (1.3x)" }, 2);
@@ -127,15 +215,18 @@ public static class ContractMenu
 
         Ui.Section("Uang Jalan");
         Console.WriteLine($"  UJ standar   : {Rules.Rp(pl.UjStd)}   = (BBM + tol + kapal + makan + cadangan rawan) x 1,1");
-        Console.WriteLine($"  UJ diberikan : {Rules.Rp(pl.UjGiven)}");
+        Console.WriteLine($"  UJ diberikan : {Rules.Rp(pl.UjGiven)}   (dibayar saat berangkat, sisa dikembalikan sesuai kejujuran supir)");
         Console.WriteLine($"  Supir minta UJ >= {pl.Driver.UjExp:0.00}x");
         if (pl.UjMult + 1e-9 < pl.Driver.UjExp)
             Console.WriteLine("  PERINGATAN: UJ lebih rendah dari permintaan supir, moralnya akan turun.");
+        long nombok = Accounting.UjShortfall(pl.UjGiven, pl.CostEst);
+        if (nombok > 0)
+            Console.WriteLine($"  PERINGATAN: UJ lebih kecil dari biaya wajib {Rules.Rp(pl.CostEst)}. Supir nombok {Rules.Rp(nombok)} dan moral turun.");
 
         Ui.Section("Perkiraan hasil");
         if (pl.Contract.Kind == "SPOT")
         {
-            Console.WriteLine($"  Pendapatan       : {Rules.Rp(pl.IncomeEst)}" + (pl.OverloadPct > 0 ? $"  (termasuk bonus overload {pl.OverloadPct}%)" : ""));
+            Console.WriteLine($"  Pendapatan kotor : {Rules.Rp(pl.IncomeEst)}" + (pl.OverloadPct > 0 ? $"  (termasuk bonus overload {pl.OverloadPct}%)" : ""));
             Console.WriteLine($"  Komisi supir     : {Rules.Rp(pl.CommissionEst)}");
         }
         else
@@ -145,8 +236,8 @@ public static class ContractMenu
 
         Ui.Section("Peluang risiko (perkiraan)");
         Console.WriteLine($"  Rem blong di tanjakan : {pl.PBrake:P0}   (kanvas rem {pl.Truck.BrakePct}%, {pl.Steep} tanjakan/turunan)");
-        Console.WriteLine($"  Kargo dicuri          : {pl.PTheft:P0}");
-        if (pl.OverloadPct > 0) Console.WriteLine($"  Kena timbangan ODOL   : {pl.PTilang:P0}");
+        Console.WriteLine($"  Kargo dicuri          : {pl.PTheft:P0}   (kargo hilang bernilai sekitar {Rules.Rp(Math.Max(pl.Contract.Fee, 200_000) * 2)})");
+        if (pl.OverloadPct > 0) Console.WriteLine($"  Kena timbangan ODOL   : {pl.PTilang:P0}   (denda sekitar {Rules.Rp((long)(Math.Max(pl.Contract.Fee, 200_000) * 0.10))} per kena)");
         Console.WriteLine($"  Pungli                : perkiraan {Rules.Rp(pl.PunguliEst)}");
         Console.WriteLine($"  Moral supir {pl.Driver.Morale}/100 memengaruhi semua peluang di atas.");
 

@@ -129,19 +129,26 @@ public static class TripSvc
         };
     }
 
-    public static string Dispatch(Player p, Plan pl)
+        public static string Dispatch(Player p, Plan pl)
     {
         if (pl.Error != null) return pl.Error;
+
+        // Validasi ulang dari kondisi terbaru: kalau angka berubah sejak preview, batalkan tanpa memotong apa pun.
+        var fresh = Build(PlayerSvc.Get(p.Id), pl.Truck.Id, pl.Contract.Id, pl.UjMult, pl.OverloadPct, pl.Policy, pl.Sec, pl.FuelMode);
+        if (fresh.Error != null) return "Preview tidak berlaku lagi: " + fresh.Error;
+        if (fresh.UjGiven != pl.UjGiven || fresh.Escort != pl.Escort || fresh.Security != pl.Security || fresh.IncomeEst != pl.IncomeEst)
+            return "Biaya berubah sejak preview (harga, event, atau kondisi). Tidak ada yang dipotong, silakan buat preview baru.";
+
         long need = pl.UjGiven + pl.Escort + pl.Security;
         var now = DateTime.UtcNow; var arrive = now.AddMinutes(pl.Minutes / Rules.DevSpeed);
         long tripFee = pl.Contract.Kind == "SPOT" ? pl.Contract.Fee : 0;
         string notes = string.Join(" ", pl.Notes); if (notes.Length > 480) notes = notes[..480];
+        int tripId = 0;
 
         try
         {
             using var c = Db.Open(); using var tx = c.BeginTransaction();
             // Semua langkah di bawah sukses bersama atau batal bersama (rollback otomatis kalau return sebelum Commit).
-            if (!Db.Spend(c, tx, p.Id, need)) return $"Kas kurang. Butuh {Rules.Rp(need)} (UJ + biaya lain).";
             if (c.Execute("UPDATE trucks SET status='ON_TRIP' WHERE id=@id AND player_id=@pid AND status='IDLE'", new { id = pl.Truck.Id, pid = p.Id }, tx) != 1)
                 return "Truk tidak lagi siap jalan.";
             if (c.Execute("UPDATE drivers SET status='ON_TRIP' WHERE id=@id AND player_id=@pid AND status='IDLE'", new { id = pl.Driver.Id, pid = p.Id }, tx) != 1)
@@ -154,9 +161,9 @@ public static class TripSvc
             }
             else
             {
-                var fresh = c.QueryFirstOrDefault<Contract>("SELECT * FROM contracts WHERE id=@id AND player_id=@pid AND status='ACTIVE'", new { id = pl.Contract.Id, pid = p.Id }, tx);
-                if (fresh == null) return "Kontrak borongan tidak aktif.";
-                if (SlotsLeft(c, fresh, tx) <= 0) return "Target trip bulan ini sudah terpenuhi (selesai + masih berjalan).";
+                var freshCt = c.QueryFirstOrDefault<Contract>("SELECT * FROM contracts WHERE id=@id AND player_id=@pid AND status='ACTIVE'", new { id = pl.Contract.Id, pid = p.Id }, tx);
+                if (freshCt == null) return "Kontrak borongan tidak aktif.";
+                if (SlotsLeft(c, freshCt, tx) <= 0) return "Target trip bulan ini sudah terpenuhi (selesai + masih berjalan).";
             }
 
             c.Execute(@"INSERT INTO trips(player_id,truck_id,driver_id,contract_id,path,km_road,km_ferry,steep,uj_given,cost_est,fuel_cost,fee,overload_pct,odol_policy,security,fuel_mode,fuel_type,uj_mult,started_at,arrive_at,status,notes,ins_type,cargo_ins)
@@ -165,13 +172,21 @@ public static class TripSvc
                       kr = pl.RoadKm, kf = pl.FerryKm, st = pl.Steep, uj = pl.UjGiven, ce = pl.CostEst, fc = pl.FuelCost, fee = tripFee,
                       ol = pl.OverloadPct, pol = pl.Policy, sec = pl.Sec, fm = pl.FuelMode, ft = pl.FuelType, um = pl.UjMult, now, arr = arrive,
                       notes, ins = pl.Truck.Insurance, ci = pl.Truck.CargoIns }, tx);
+            tripId = c.ExecuteScalar<int>("SELECT LAST_INSERT_ID()", transaction: tx);
+
+            // UJ dan biaya awal keluar SEKALI di sini; hasil trip hanya mengembalikan sisa / menagih kekurangan.
+            string rute = $"{pl.Contract.Origin}->{pl.Contract.Dest}";
+            if (!Db.Spend(c, tx, p.Id, pl.UjGiven, "UANG_JALAN", $"UJ trip #{tripId} {rute}", tripId)
+                || !Db.Spend(c, tx, p.Id, pl.Escort, "PENGAWALAN", $"Pengawalan trip #{tripId}", tripId)
+                || !Db.Spend(c, tx, p.Id, pl.Security, "KEAMANAN", $"Uang keamanan trip #{tripId}", tripId))
+                return $"Kas kurang. Butuh {Rules.Rp(need)} (UJ + biaya lain). Tidak ada yang berubah.";
             tx.Commit();
         }
         catch (MySqlException ex)
         {
             return "Gagal menyimpan perjalanan, tidak ada yang berubah (uang tidak dipotong): " + ex.Message;
         }
-        return $"{pl.Truck.ModelName} berangkat ke {pl.Contract.Dest} (supir {pl.Driver.Name}). UJ {Rules.Rp(pl.UjGiven)}. Tiba ~{pl.Minutes / Rules.DevSpeed:0.#} menit real-time.";
+        return $"{pl.Truck.ModelName} berangkat ke {pl.Contract.Dest} (supir {pl.Driver.Name}), trip #{tripId}. UJ {Rules.Rp(pl.UjGiven)}. Tiba ~{pl.Minutes / Rules.DevSpeed:0.#} menit real-time. Laporan: menu Perjalanan > ID {tripId}.";
     }
 
     public static List<Trip> Running(int pid)
@@ -283,7 +298,7 @@ public static class TripSvc
         double newPen = Math.Min(2.0, p.PremiumPenalty + (claim > 0 ? 0.25 : 0));
         if (claim > 0) log.Add($"Klaim asuransi cair {Rules.Rp(claim)} (premi bulan depan naik).");
 
-        // Penyelesaian uang jalan
+        // Penyelesaian uang jalan (UJ sudah dipotong saat berangkat)
         long spend = t.CostEst + pungli;
         long shortfall = Math.Max(0, spend - t.UjGiven), leftover = Math.Max(0, t.UjGiven - spend);
         double hf = drv.Morale < 30 ? 0.5 : drv.Honesty / 10.0; if (fuelSold) hf *= 0.7;
@@ -295,21 +310,35 @@ public static class TripSvc
 
         long commission = ok ? (long)(income * drv.CommissionPct / 100.0) : 0;
         if (ok && !incident) repD += 2;
-        long cashDelta = income - commission + returned - shortfall - costs - (total ? 0 : damage) - cargoLoss + claim;
+        long damagePaid = total ? 0 : damage;
 
         string head = ok ? $"Truk {truck.ModelName} tiba di {ct.Dest}. Pendapatan {Rules.Rp(income)}, komisi supir {Rules.Rp(commission)}."
                          : $"Pengiriman ke {ct.Dest} GAGAL.";
         log.Insert(0, head);
-        log.Add($"Arus kas perjalanan: {(cashDelta >= 0 ? "+" : "")}{Rules.Rp(cashDelta)}.");
 
-        // ---- Tulis hasil: semua atau tidak sama sekali ----
+        // ---- Tulis hasil: semua atau tidak sama sekali. Setiap perubahan kas = satu baris ledger bertaut ke trip ----
         using var tx = c.BeginTransaction();
         // Klaim trip lebih dulu supaya tidak pernah diselesaikan dua kali
         if (c.Execute("UPDATE trips SET status='DONE' WHERE id=@id AND status='RUNNING'", new { id = t.Id }, tx) == 0)
             return new List<string>();
 
-        c.Execute("UPDATE players SET cash=cash+@cd,rep_delivery=GREATEST(0,LEAST(400,rep_delivery+@rep)),deliveries_ok=deliveries_ok+@ok,premium_penalty=@pen WHERE id=@id",
-            new { cd = cashDelta, rep = repD, ok = ok ? 1 : 0, pen = newPen, id = p.Id }, tx);
+        string rute = $"{ct.Origin}->{ct.Dest}";
+        Db.Post(c, tx, p.Id, income, "PENDAPATAN_TRIP", $"Trip #{t.Id} {rute}", t.Id);
+        Db.Post(c, tx, p.Id, -commission, "KOMISI_SUPIR", $"Trip #{t.Id}", t.Id);
+        Db.Post(c, tx, p.Id, returned, "UJ_KEMBALI", $"Sisa UJ trip #{t.Id}", t.Id);
+        Db.Post(c, tx, p.Id, -shortfall, "UJ_KEKURANGAN", $"Nombok supir trip #{t.Id}", t.Id);
+        Db.Post(c, tx, p.Id, -costs, "BIAYA_INSIDEN", $"Denda/mogok trip #{t.Id}", t.Id);
+        Db.Post(c, tx, p.Id, -damagePaid, "KERUSAKAN", $"Kerusakan trip #{t.Id}", t.Id);
+        Db.Post(c, tx, p.Id, -cargoLoss, "KARGO_HILANG", $"Kargo trip #{t.Id}", t.Id);
+        Db.Post(c, tx, p.Id, claim, "KLAIM_ASURANSI", $"Klaim trip #{t.Id}", t.Id);
+
+        long tripNet = c.ExecuteScalar<long>("SELECT COALESCE(SUM(amount),0) FROM ledger WHERE trip_id=@id AND player_id=@pid", new { id = t.Id, pid = p.Id }, tx);
+        log.Add($"Laba/rugi trip #{t.Id} (termasuk UJ & biaya berangkat): {Accounting.Signed(tripNet)}.");
+        if (ct.Kind != "SPOT")
+            log.Add($"Pendapatan borongan (setara {Rules.Rp(ct.MonthlyPay / Math.Max(1, ct.TripsPerMonth))} per trip) cair saat tutup buku, bukan sekarang.");
+
+        c.Execute("UPDATE players SET rep_delivery=GREATEST(0,LEAST(400,rep_delivery+@rep)),deliveries_ok=deliveries_ok+@ok,premium_penalty=@pen WHERE id=@id",
+            new { rep = repD, ok = ok ? 1 : 0, pen = newPen, id = p.Id }, tx);
         if (total) c.Execute("UPDATE trucks SET status='TOTALLOSS',driver_id=NULL WHERE id=@id", new { id = truck.Id }, tx);
         else
         {

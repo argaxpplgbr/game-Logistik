@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Dapper;
 using Nusantara.Database;
 using Nusantara.Models;
@@ -25,7 +26,7 @@ public static class PlayerSvc
         static string Spend(int id, long cost, string setSql, string ok)
     {
         using var c = Db.Open(); using var tx = c.BeginTransaction();
-        if (!Db.Spend(c, tx, id, cost)) return $"Uang kurang ({Rules.Rp(cost)}).";
+        if (!Db.Spend(c, tx, id, cost, "FASILITAS", ok)) return $"Uang kurang ({Rules.Rp(cost)}).";
         c.Execute($"UPDATE players SET {setSql} WHERE id=@id", new { id }, tx);
         tx.Commit();
         return ok;
@@ -127,10 +128,11 @@ public static class PlayerSvc
         if (p.Tier < cp.minTier) return "Tier belum cukup.";
         if (day - p.SocialLastDay < 3) return "Kampanye berikutnya baru bisa setelah 3 hari game.";
         if (p.RepBrand >= 100) return "Brand awareness sudah maksimal (100). Sisanya wajib dari pengiriman sukses.";
-        if (p.Cash < cp.cost) return "Uang kurang.";
         int g = Math.Min(cp.gain, 100 - p.RepBrand);
-        using var c = Db.Open();
-        c.Execute("UPDATE players SET cash=cash-@cost,rep_brand=rep_brand+@g,social_last_day=@day WHERE id=@id", new { cost = cp.cost, g, day, id });
+        using var c = Db.Open(); using var tx = c.BeginTransaction();
+        if (!Db.Spend(c, tx, id, cp.cost, "MARKETING", cp.name)) return "Uang kurang.";
+        c.Execute("UPDATE players SET rep_brand=rep_brand+@g,social_last_day=@day WHERE id=@id", new { g, day, id }, tx);
+        tx.Commit();
         return $"Kampanye '{cp.name}' sukses: reputasi brand +{g}.";
     }
 
@@ -148,7 +150,7 @@ public static class PlayerSvc
         var pk = Packs[idx]; using var c = Db.Open(); using var tx = c.BeginTransaction();
         c.Execute("INSERT INTO topups(player_id,pack,cash,price_idr,created_at) VALUES(@id,@n,@cash,@idr,@now)",
             new { id, n = pk.name, cash = pk.cash, idr = pk.idr, now = DateTime.UtcNow }, tx);
-        c.Execute("UPDATE players SET cash=cash+@cash WHERE id=@id", new { cash = pk.cash, id }, tx);
+        Db.Post(c, tx, id, pk.cash, "TOPUP_SIMULASI", pk.name);
         tx.Commit();
         return $"[SIMULASI bayar Rp {pk.idr:N0}] +{Rules.Rp(pk.cash)}. Ingat: rating/reputasi tidak bisa dibeli, kontrak kelas atas tetap terkunci.";
     }

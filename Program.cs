@@ -6,10 +6,10 @@ using Nusantara.Services;
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
-try {Db.EnsureMigrations(); }
-catch(Exception ex)
+try { Db.EnsureMigrations(); }
+catch (Exception ex)
 {
-    Console.WriteLine("gagal terhubung ke database:" + ex.Message);
+    Console.WriteLine("gagal terhubung ke database: " + ex.Message);
     Console.WriteLine("Cek variabel NUSANTARA_DB_CONN (atau placeholder di database) dan pastikan MySql menyala");
     return;
 }
@@ -18,6 +18,7 @@ Console.Write("Nama perusahaan: ");
 var nm = (Console.ReadLine() ?? "").Trim();
 if (nm == "") nm = "Pemain";
 int pid = PlayerSvc.GetOrCreate(nm).Id;
+LedgerSvc.EnsureOpening(pid);   // saldo awal buku kas (sekali saja)
 
 while (true)
 {
@@ -46,6 +47,9 @@ while (true)
         case "8": BankMenu.Run(pid); break;
         case "9": FacilityMenu.Run(pid); break;
         case "10": ShopMenu.Run(pid); break;
+        case "11": LedgerMenu.Run(pid); break;
+        case "12": FinanceMenu.Run(pid); break;
+        case "13": TutorialMenu.Run(pid); break;
         case "0": return;
     }
 }
