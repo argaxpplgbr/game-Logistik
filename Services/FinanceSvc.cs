@@ -66,6 +66,28 @@ public static class FinanceSvc
         return new Bills(payroll, rent, prem);
     }
 
+    // Biaya tetap per bulan (gaji+BPJS+staf TANPA tunggakan, sewa, premi, cicilan) + jumlah truk. Untuk alokasi overhead trip.
+    static (int pid, DateTime at, long fixedMonthly, int trucks) _fixedCache;
+    public static (long fixedMonthly, int trucks) FixedMonthly(Player p, bool fresh = false)
+    {
+        var cc = _fixedCache;
+        if (!fresh && cc.pid == p.Id && (DateTime.UtcNow - cc.at).TotalSeconds < 5) return (cc.fixedMonthly, cc.trucks);
+        var fleet = FleetSvc.Fleet(p.Id); var staff = HrSvc.Staff(p.Id);
+        var bills = ComputeBills(p, fleet, staff, PlayerSvc.Day(p));
+        long fixedM = Math.Max(0, bills.Payroll - p.Arrears) + bills.Rent + bills.Premium + Loans(p.Id).Sum(l => l.Installment);
+        _fixedCache = (p.Id, DateTime.UtcNow, fixedM, fleet.Count);
+        return (fixedM, fleet.Count);
+    }
+
+    // Cadangan operasi yang disarankan (uang yang sebaiknya tetap tersedia, BUKAN biaya yang dicatat).
+    public static long OperatingReserve(Player p, ClosePreview v)
+    {
+        var fleet = FleetSvc.Fleet(p.Id);
+        double lab = FleetSvc.LaborFactor(p, false);
+        long backlog = fleet.Sum(t => EconomySvc.ServiceBacklog(t.OilPct, t.BrakePct, t.TirePct, t.FilterPct, t.EnginePct, t.Tier, lab));
+        return EconomySvc.OperatingReserve(v.MinNeeded, fleet.Where(t => t.DriverId != null).Select(t => t.MaxLoad).ToList(), backlog);
+    }
+
     public static ClosePreview Preview(int pid)
     {
         var p = PlayerSvc.Get(pid); int day = PlayerSvc.Day(p);

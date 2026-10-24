@@ -11,10 +11,31 @@ public static class FleetSvc
         LEFT JOIN bodies b ON b.code=t.body_code";
 
     public static readonly string[] Comps = { "OIL", "BRAKE", "TIRE", "FILTER", "ENGINE" };
-    public static int MaxTrucks(int tier) => tier == 1 ? 4 : tier == 2 ? 12 : 40;
+    public static int MaxTrucks(int tier) => tier == 1 ? 5 : tier == 2 ? 12 : 40;
     public static int Pct(Truck t, string k) => k switch { "OIL" => t.OilPct, "BRAKE" => t.BrakePct, "TIRE" => t.TirePct, "FILTER" => t.FilterPct, _ => t.EnginePct };
     static string Col(string k) => k.ToLower() + "_pct";
+    
+    // Faktor biaya tenaga servis: satu sumber untuk servis dan estimasi.
+    public static double LaborFactor(Player p, bool includeAd)
+    {
+        bool mech = p.PoolType != "NONE" && p.Mechanics > 0;
+        double lab = mech ? 0.7 : 2.0;
+        if (p.Warehouse) lab *= 0.85;
+        if (includeAd && p.AdDiscount) lab *= 0.85;
+        return lab;
+    }
 
+    // Ringkasan sebelum beli (tidak mengubah apa pun di database).
+    public static PurchaseView PreviewPurchase(int pid, long price, int maxLoad, string sim, long extraBacklog)
+    {
+        var p = PlayerSvc.Get(pid);
+        var fleet = Fleet(pid);
+        double lab = LaborFactor(p, false);
+        long backlog = fleet.Sum(t => EconomySvc.ServiceBacklog(t.OilPct, t.BrakePct, t.TirePct, t.FilterPct, t.EnginePct, t.Tier, lab)) + extraBacklog;
+        var fx = FinanceSvc.FixedMonthly(p, true);
+        var loads = fleet.Where(t => t.DriverId != null).Select(t => t.MaxLoad).ToList();
+        return EconomySvc.Purchase(p.Cash, price, sim, maxLoad, fx.fixedMonthly, loads, backlog);
+    }
     public static List<Truck> Fleet(int pid)
     {
         using var c = Db.Open();
@@ -128,9 +149,7 @@ public static class FleetSvc
         var list = comp == "ALL" ? Comps.Where(k => Pct(t, k) < 60).ToArray() : new[] { comp };
         if (list.Length == 0) return "Semua komponen masih di atas 60%.";
         bool mech = p.PoolType != "NONE" && p.Mechanics > 0;
-        double lab = mech ? 0.7 : 2.0;               // mekanik tetap hemat, mekanik panggilan mahal
-        if (p.Warehouse) lab *= 0.85;
-        if (p.AdDiscount) lab *= 0.85;
+       double lab = LaborFactor(p, true);
         long cost = (long)list.Sum(k => Rules.PartPrice(k, t.Tier) * lab);
         using var c = Db.Open(); using var tx = c.BeginTransaction();
         if (!Db.Spend(c, tx, pid, cost)) return $"Uang kurang ({Rules.Rp(cost)}).";

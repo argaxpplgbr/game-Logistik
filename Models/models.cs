@@ -1,3 +1,5 @@
+using System.Dynamic;
+
 namespace Nusantara.Models;
 
 public class Player
@@ -73,6 +75,7 @@ public class Contract
     public int WeightKg { get; set; } public long Fee { get; set; } public int RepRequired { get; set; } public string Status { get; set; } = "";
     public int CreatedDay { get; set; } public int ExpireDay { get; set; } public int MonthsTotal { get; set; } public int MonthsDone { get; set; }
     public int TripsPerMonth { get; set; } public int TripsDoneMonth { get; set; } public long MonthlyPay { get; set; }
+    public string VehicleClass { get; set; } = ""; public double QuoteKm { get; set; } public int QuoteRate { get; set; } public double QuoteMult { get; set; } = 1.0;
 }
 
 public class Trip
@@ -83,9 +86,9 @@ public class Trip
     public long Fee { get; set; } public int OverloadPct { get; set; } public string OdolPolicy { get; set; } = ""; public string Security { get; set; } = "";
     public string FuelMode { get; set; } = ""; public string FuelType { get; set; } = ""; public double UjMult { get; set; }
     public DateTime StartedAt { get; set; } public DateTime ArriveAt { get; set; } public string Status { get; set; } = "";
-        public string InsType { get; set; } = "NONE"; public bool CargoIns { get; set; }
+    public string InsType { get; set; } = "NONE"; public bool CargoIns { get; set; }
     public string Notes { get; set; } = ""; public string Result { get; set; } = "";
-    
+    public long WearEst { get; set; } public long OverheadEst { get; set; }
 }
 
 public class Node { public int Id { get; set; } public string Name { get; set; } = ""; public string Island { get; set; } = ""; }
@@ -119,6 +122,7 @@ public class Plan
     public double RoadKm, FerryKm, Liters, Minutes; public int Steep, OverloadPct;
     public long FuelCost, Toll, Ferry, Meal, Reserve, Escort, Security, CostEst, UjStd, UjGiven;
     public long IncomeEst, CommissionEst, MonthlyShare, NetOk, NetWorst, PunguliEst;
+    public long WearEst, OverheadEst, ContribEst;
     public double PBrake, PTheft, PTilang;
     public string Policy = "DENDA", Sec = "NONE", FuelMode = "NORMAL", FuelType = "BIO"; public double UjMult = 1.0;
 }

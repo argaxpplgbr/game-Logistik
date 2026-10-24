@@ -117,6 +117,11 @@ public static class TripSvc
         long netOk = incomeEst - commissionEst - ujGiven + returnedEst - shortEst - escort - security;
         long cargoValue = Math.Max(ct.Fee, 200_000) * 2;
         long netWorst = netOk - (incomeEst - commissionEst) - cargoValue;
+         var fx = FinanceSvc.FixedMonthly(p);
+        long wearEst = EconomySvc.WearReserve(t, road, path.Count(e => e.Steep), d.Morale, fuel, FleetSvc.LaborFactor(p, false));
+        long overheadEst = EconomySvc.OverheadPerTrip(fx.fixedMonthly, fx.trucks);
+        long shareIncome = spot ? 0 : ct.MonthlyPay / Math.Max(1, ct.TripsPerMonth);
+        long contribEst = netOk + shareIncome - wearEst;
 
         return new Plan
         {
@@ -125,11 +130,12 @@ public static class TripSvc
             Reserve = reserve, Escort = escort, Security = security, CostEst = spendEst, UjStd = ujStd,
             UjGiven = ujGiven, Minutes = minutes, Policy = policy, Sec = sec, FuelMode = fm, FuelType = fuel, UjMult = ujMult,
             IncomeEst = incomeEst, CommissionEst = commissionEst, MonthlyShare = spot ? 0 : ct.MonthlyPay / Math.Max(1, ct.TripsPerMonth),
-            NetOk = netOk, NetWorst = netWorst, PBrake = pBrake, PTheft = pTheft, PTilang = pTilang, PunguliEst = punguliEst
+            NetOk = netOk, NetWorst = netWorst, PBrake = pBrake, PTheft = pTheft, PTilang = pTilang, PunguliEst = punguliEst,
+            WearEst = wearEst, OverheadEst = overheadEst, ContribEst = contribEst
         };
     }
 
-        public static string Dispatch(Player p, Plan pl)
+    public static string Dispatch(Player p, Plan pl)
     {
         if (pl.Error != null) return pl.Error;
 
@@ -166,12 +172,12 @@ public static class TripSvc
                 if (SlotsLeft(c, freshCt, tx) <= 0) return "Target trip bulan ini sudah terpenuhi (selesai + masih berjalan).";
             }
 
-            c.Execute(@"INSERT INTO trips(player_id,truck_id,driver_id,contract_id,path,km_road,km_ferry,steep,uj_given,cost_est,fuel_cost,fee,overload_pct,odol_policy,security,fuel_mode,fuel_type,uj_mult,started_at,arrive_at,status,notes,ins_type,cargo_ins)
-                VALUES(@pid,@tid,@did,@cid,@path,@kr,@kf,@st,@uj,@ce,@fc,@fee,@ol,@pol,@sec,@fm,@ft,@um,@now,@arr,'RUNNING',@notes,@ins,@ci)",
+            c.Execute(@"INSERT INTO trips(player_id,truck_id,driver_id,contract_id,path,km_road,km_ferry,steep,uj_given,cost_est,fuel_cost,fee,overload_pct,odol_policy,security,fuel_mode,fuel_type,uj_mult,started_at,arrive_at,status,notes,ins_type,cargo_ins,wear_est,overhead_est)
+                VALUES(@pid,@tid,@did,@cid,@path,@kr,@kf,@st,@uj,@ce,@fc,@fee,@ol,@pol,@sec,@fm,@ft,@um,@now,@arr,'RUNNING',@notes,@ins,@ci,@we,@oe)",
                 new { pid = p.Id, tid = pl.Truck.Id, did = pl.Driver.Id, cid = pl.Contract.Id, path = string.Join(",", pl.Path.Select(e => e.Id)),
                       kr = pl.RoadKm, kf = pl.FerryKm, st = pl.Steep, uj = pl.UjGiven, ce = pl.CostEst, fc = pl.FuelCost, fee = tripFee,
                       ol = pl.OverloadPct, pol = pl.Policy, sec = pl.Sec, fm = pl.FuelMode, ft = pl.FuelType, um = pl.UjMult, now, arr = arrive,
-                      notes, ins = pl.Truck.Insurance, ci = pl.Truck.CargoIns }, tx);
+                      notes, ins = pl.Truck.Insurance, ci = pl.Truck.CargoIns, we = pl.WearEst, oe = pl.OverheadEst }, tx);
             tripId = c.ExecuteScalar<int>("SELECT LAST_INSERT_ID()", transaction: tx);
 
             // UJ dan biaya awal keluar SEKALI di sini; hasil trip hanya mengembalikan sisa / menagih kekurangan.

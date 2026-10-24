@@ -74,6 +74,14 @@ public static class Db
         if (!Has("players", "tutorial_reward")) c.Execute("ALTER TABLE players ADD COLUMN tutorial_reward INT NOT NULL DEFAULT 0");
         if (!Has("players", "tutorial_report")) c.Execute("ALTER TABLE players ADD COLUMN tutorial_report INT NOT NULL DEFAULT 0");
 
+                // v4: snapshot kuotasi kontrak + estimasi keausan/overhead per trip (non-destruktif)
+        if (!Has("contracts", "vehicle_class")) c.Execute("ALTER TABLE contracts ADD COLUMN vehicle_class VARCHAR(10) NOT NULL DEFAULT ''");
+        if (!Has("contracts", "quote_km")) c.Execute("ALTER TABLE contracts ADD COLUMN quote_km DOUBLE NOT NULL DEFAULT 0");
+        if (!Has("contracts", "quote_rate")) c.Execute("ALTER TABLE contracts ADD COLUMN quote_rate INT NOT NULL DEFAULT 0");
+        if (!Has("contracts", "quote_mult")) c.Execute("ALTER TABLE contracts ADD COLUMN quote_mult DOUBLE NOT NULL DEFAULT 1");
+        if (!Has("trips", "wear_est")) c.Execute("ALTER TABLE trips ADD COLUMN wear_est BIGINT NOT NULL DEFAULT 0");
+        if (!Has("trips", "overhead_est")) c.Execute("ALTER TABLE trips ADD COLUMN overhead_est BIGINT NOT NULL DEFAULT 0");
+
         // v3: buku kas. amount bertanda (+masuk / -keluar), integer rupiah.
         c.Execute(@"CREATE TABLE IF NOT EXISTS ledger (
             id INT AUTO_INCREMENT PRIMARY KEY, player_id INT NOT NULL, game_day INT NOT NULL, created_at DATETIME NOT NULL,

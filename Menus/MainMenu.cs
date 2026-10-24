@@ -25,6 +25,8 @@ public static class MainMenu
         Console.WriteLine($"  Rating     : {p.Stars:0.0} bintang (reputasi {p.Reputation})");
         Console.WriteLine($"  Armada     : {trucks}/{FleetSvc.MaxTrucks(p.Tier)} truk");
         Console.WriteLine($"  Tutup buku : hari {fin.NextDay} ({fin.DaysLeft} hari lagi), tagihan sekitar {Rules.Rp(fin.MinNeeded)}");
+        long reserve = FinanceSvc.OperatingReserve(p, fin);
+        Console.WriteLine($"  Cadangan operasi disarankan : {Rules.Rp(reserve)}" + (p.Cash < reserve ? "   (kas di bawah cadangan)" : ""));
         if (fin.NoIncome.EndCash < 0)
             Console.WriteLine("  !! PERINGATAN: tanpa pemasukan baru, kas TIDAK cukup untuk tutup buku (menu 12).");
 

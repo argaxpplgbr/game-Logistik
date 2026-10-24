@@ -23,12 +23,14 @@ public static class FinanceMenu
             Console.WriteLine($"  Premi asuransi                : {Rules.Rp(v.Bills.Premium)}");
             foreach (var l in v.Loans) Console.WriteLine($"  Cicilan pinjaman #{l.Id,-12}     : {Rules.Rp(l.Installment)}");
             Console.WriteLine($"  SALDO MINIMUM YANG PERLU DIJAGA: {Rules.Rp(v.MinNeeded)}");
+            var pl = PlayerSvc.Get(pid);
+            Console.WriteLine($"  Cadangan operasi disarankan    : {Rules.Rp(FinanceSvc.OperatingReserve(pl, v))}   (tagihan + UJ 2 perjalanan per truk aktif + servis tertunda)");
 
             Ui.Section("Jawaban cepat: kalau tidak ada pemasukan sampai tutup buku?");
             long gap = v.NoIncome.EndCash;
             Console.WriteLine(gap >= 0
                 ? $"  Kas CUKUP. Sisa setelah tutup buku: {Rules.Rp(gap)}."
-                : $"  Kas TIDAK CUKUP. Kekurangan {Rules.Rp(-gap)} ({Accounting.CashStatus(gap)}).");
+                : $"  Kas TIDAK CUKUP. Kekurangan {Rules.Rp(-gap)} ({Accounting.CashStatus(gap)}). Pemasukan kas minimal {Rules.Rp(-gap)} dibutuhkan sebelum tutup buku.");
 
             Ui.Options(new[] { "Proyeksi 7 hari", "Proyeksi 30 hari", "Lunasi pinjaman" });
             switch (Ui.Ask("Pilih: "))

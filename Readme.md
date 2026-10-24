@@ -103,6 +103,16 @@ Urutan yang aku sarankan untuk menit-menit pertama:
 
 Beberapa tips: kasih uang jalan standar atau lebih supaya supir tidak ngambek, jangan beli truk bekas di awal karena komponennya sudah hampir habis, dan kalau ada kontrak yang minta reputasi tinggi, lewati dulu. Cek menu Keuangan & Tutup Buku sebelum menambah staf atau mengambil utang.
 
+## Ekonomi v4 (ringkas)
+
+- Modal awal akun BARU Rp 1,5 miliar. Akun lama tidak diubah. Batas armada Tier 1 jadi 5 truk.
+- Tarif spot dan borongan dihitung dari kelas kendaraan x jarak tertagih x tarif/km x faktor pasar, dengan minimum per dispatch. Tarif/km diundi sekali saat kontrak dibuat lalu dikunci.
+- Semua rumus ada di `Services/EconomySvc.cs`. Kelas bertanda "asumsi" adalah angka balancing, bukan tarif resmi pasar.
+- Preview kontrak memisahkan kas bersih trip, cadangan keausan (BUKAN buku kas), kontribusi trip, dan overhead.
+- Ada ringkasan saldo dan cadangan operasi sebelum beli truk baru atau bekas.
+- Kolom database ditambah otomatis saat game jalan. Tidak perlu reset.
+- Tes: `dotnet test Tests/Nusantara.Tests.csproj`
+
 ## Isi menu
 
 Menu utama ada 13 pilihan. Setiap submenu bakal terus muncul sampai kamu pilih 0 untuk kembali.
@@ -137,7 +147,7 @@ Sebelum benar-benar berangkat, game menghitung ulang semua syarat. Kalau biaya b
 
 Kamu mulai sebagai usaha perorangan. Dari situ naik jadi CV, lalu PT.
 
-Tier 1 (perorangan) cuma boleh pakai pick-up dan blind van, maksimal 4 truk, dan rutenya dalam kota sampai sekitar 150 km.
+Tier 1 (perorangan) cuma boleh pakai pick-up dan blind van, maksimal 5 truk, dan rutenya dalam kota sampai sekitar 150 km.
 
 Tier 2 (CV) butuh reputasi 50 dan uang Rp 150 juta. Bisa pakai engkel, double, dan medium duty, maksimal 12 truk, jangkauannya satu pulau Jawa.
 

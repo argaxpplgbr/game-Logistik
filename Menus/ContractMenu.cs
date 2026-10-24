@@ -79,7 +79,7 @@ public static class ContractMenu
         {
             Console.WriteLine();
             Console.WriteLine($"[{k.Id}] {k.Client}: {k.Origin} -> {k.Dest}   {Flag(fz)}");
-            Console.WriteLine($"     Kargo   : {k.CargoCode}, {k.WeightKg:N0} kg per trip");
+            Console.WriteLine($"     Kargo   : {k.CargoCode}, {k.WeightKg:N0} kg" + (k.VehicleClass != "" ? $"   |  kelas {k.VehicleClass}" : ""));
             Console.WriteLine($"     Bayaran : {Rules.Rp(k.MonthlyPay)} per bulan");
             Console.WriteLine($"     Target  : {k.TripsPerMonth} trip/bulan selama {k.MonthsTotal} bulan ({k.TripsDoneMonth} trip bulan ini)");
             Console.WriteLine($"     Syarat  : reputasi >= {k.RepRequired}   (status {k.Status})");
@@ -87,13 +87,13 @@ public static class ContractMenu
     }
 
     static string Flag(Feasibility fz) =>
-        fz.Ok ? (fz.Best != null ? $"[LAYAK, laba ~{Rules.Rp(fz.Best.NetOk)}]" : "[LAYAK]") : "[BELUM LAYAK]";
-
+        fz.Ok ? (fz.Best != null ? $"[LAYAK, kontribusi ~{Rules.Rp(fz.Best.ContribEst)}]" : "[LAYAK]") : "[BELUM LAYAK]";
     static void ShowPreview(Contract k, Feasibility fz)
     {
         Ui.Section($"Preview kontrak [{k.Id}]");
         Console.WriteLine($"  Status kelayakan : {(fz.Ok ? "LAYAK dijalankan dengan kondisi sekarang" : "BELUM LAYAK")}");
         foreach (var r in fz.Reasons) Console.WriteLine("  - " + r);
+        ShowQuote(k);
 
         if (fz.Best != null)
         {
@@ -104,13 +104,18 @@ public static class ContractMenu
                 Console.WriteLine($"  Pendapatan kotor : {Rules.Rp(b.IncomeEst)}");
                 Console.WriteLine($"  Komisi supir     : {Rules.Rp(b.CommissionEst)}");
                 Console.WriteLine($"  UJ diberikan     : {Rules.Rp(b.UjGiven)}   (biaya wajib perkiraan {Rules.Rp(b.CostEst)})");
-                Console.WriteLine($"  Estimasi bersih  : {Rules.Rp(b.NetOk)}   (margin {Accounting.Margin(b.NetOk, b.IncomeEst):P0})");
+                Console.WriteLine($"  Kas bersih trip  : {Rules.Rp(b.NetOk)}   (margin {Accounting.Margin(b.NetOk, b.IncomeEst):P0})");
             }
             else
             {
                 Console.WriteLine($"  Pendapatan       : setara {Rules.Rp(b.MonthlyShare)} per trip (cair bulanan)");
                 Console.WriteLine($"  Biaya per trip   : UJ {Rules.Rp(b.UjGiven)}, biaya wajib perkiraan {Rules.Rp(b.CostEst)}");
+                Console.WriteLine($"  Kas trip         : {Rules.Rp(b.NetOk)}   (belum ada pemasukan kas, bayaran cair saat tutup buku)");
             }
+            ShowEconomy(b, k.Kind == "SPOT");
+            string tc = EconomySvc.ClassForTruck(b.Truck.MaxLoad);
+            if (k.VehicleClass != "" && tc != k.VehicleClass)
+                Console.WriteLine($"  Catatan kelas    : truk kelas {tc}, kontrak dibayar sebagai kelas {k.VehicleClass} (tarif tidak naik walau truk lebih besar).");
             Console.WriteLine("  Asumsi           : UJ standar, tanpa overload, tanpa kejadian acak (pungli, mogok, kecelakaan).");
         }
 
@@ -122,6 +127,24 @@ public static class ContractMenu
                 Console.WriteLine("  Jika " + Accounting.DedicatedFormula(k.MonthlyPay, k.TripsPerMonth, d));
             Console.WriteLine("  Trip yang masih berjalan saat tutup buku tidak dihitung untuk target.");
         }
+    }
+
+        // Rincian kuotasi yang sudah dikunci pada kontrak
+    static void ShowQuote(Contract k)
+    {
+        if (k.VehicleClass == "") { Console.WriteLine("  Kuotasi          : kontrak lama (sebelum v4), nilai sesuai kesepakatan awal."); return; }
+        var band = EconomySvc.Band(k.VehicleClass);
+        Console.WriteLine($"  Kuotasi dikunci  : kelas {band.Name}, jarak tertagih {k.QuoteKm:0} km, tarif {Rules.Rp(k.QuoteRate)}/km, faktor pasar x{k.QuoteMult:0.00}");
+        Console.WriteLine($"  Minimum dispatch : {Rules.Rp(band.MinDispatch)}" + (band.Assumed ? "   (tarif kelas ini asumsi balancing, bukan kutipan pasar)" : ""));
+    }
+
+    // Keausan & overhead: angka ekonomi, BUKAN uang yang langsung keluar dari kas
+    static void ShowEconomy(Plan b, bool spot)
+    {
+        Console.WriteLine($"  Cadangan keausan : {Rules.Rp(b.WearEst)}   (estimasi servis, BUKAN pengeluaran kas sebelum servis dibayar)");
+        Console.WriteLine($"  Kontribusi trip  : {Rules.Rp(b.ContribEst)}" + (spot ? "" : "   (jika target trip bulanan tercapai)"));
+        Console.WriteLine($"  Bagian overhead  : {Rules.Rp(b.OverheadEst)} per trip   (biaya tetap bulanan dibagi {EconomySvc.PlannedTripsPerTruckMonth} trip per truk)");
+        Console.WriteLine($"  Hasil setelah overhead : {Rules.Rp(b.ContribEst - b.OverheadEst)}");
     }
 
     // Tampilkan dampak tiap pilihan SEBELUM pemain memilih
@@ -231,7 +254,8 @@ public static class ContractMenu
         }
         else
             Console.WriteLine($"  Pendapatan       : dibayar bulanan lewat tutup buku (setara {Rules.Rp(pl.MonthlyShare)} per trip), tidak cair saat tiba");
-        Console.WriteLine($"  Bersih jika lancar : {Rules.Rp(pl.NetOk)}   (belum termasuk pungli/mogok/kerusakan)");
+        Console.WriteLine($"  Kas bersih jika lancar : {Rules.Rp(pl.NetOk)}   (belum termasuk pungli/mogok/kerusakan)");
+        ShowEconomy(pl, pl.Contract.Kind == "SPOT");
         Console.WriteLine($"  Bersih terburuk    : {Rules.Rp(pl.NetWorst)}   (kargo hilang/dicuri, sebelum klaim asuransi)");
 
         Ui.Section("Peluang risiko (perkiraan)");

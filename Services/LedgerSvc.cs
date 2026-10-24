@@ -14,6 +14,7 @@ public class TripInfo
 {
     public string Status { get; set; } = ""; public string Origin { get; set; } = ""; public string Dest { get; set; } = "";
     public string Kind { get; set; } = ""; public long MonthlyPay { get; set; } public int TripsPerMonth { get; set; }
+    public long WearEst { get; set; } public long OverheadEst { get; set; }
 }
 
 public static class LedgerSvc
@@ -73,7 +74,7 @@ public static class LedgerSvc
     public static TripInfo? TripInfo(int pid, int tripId)
     {
         using var c = Db.Open();
-        return c.QueryFirstOrDefault<TripInfo>(@"SELECT t.status, k.origin, k.dest, k.kind, k.monthly_pay, k.trips_per_month
+            return c.QueryFirstOrDefault<TripInfo>(@"SELECT t.status, k.origin, k.dest, k.kind, k.monthly_pay, k.trips_per_month, t.wear_est, t.overhead_est
             FROM trips t JOIN contracts k ON k.id=t.contract_id WHERE t.id=@tripId AND t.player_id=@pid", new { pid, tripId });
     }
 

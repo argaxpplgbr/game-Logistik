@@ -50,25 +50,27 @@ public static class ContractSvc
             if (p.Tier == 3 && road + sea < 150) continue;
             int kg = R.Next(cg.MinKg, cg.MaxKg + 1) / 10 * 10;
             double em = WorldSvc.RateMult(ev, cg.Code);
-            long ferryExtra = (long)(path.Where(e => e.Kind == "FERRY").Sum(e => (double)e.FerryFee) * 1.3);
-            long fee = (long)((road + sea * 0.5) * (kg / 1000.0) * cg.Rate * em * (0.9 + R.NextDouble() * 0.2)) + ferryExtra;
-            fee = Math.Max(150_000, fee / 1000 * 1000);
+            long ferryFeeSum = path.Where(e => e.Kind == "FERRY").Sum(e => e.FerryFee);
+            string vclass = EconomySvc.ClassForWeight(kg);
+            var quote = EconomySvc.MakeQuote(vclass, EconomySvc.BilledKm(road, sea), em, R.NextDouble(), ferryFeeSum, cg.B3);
+            long fee = quote.Fee;
+
             if (kind == "SPOT")
             {
                 int rep = R.NextDouble() < 0.7 ? 0 : R.Next(1, 4) * 40;
-                c.Execute(@"INSERT INTO contracts(player_id,kind,client,origin,dest,cargo_code,weight_kg,fee,rep_required,status,created_day,expire_day)
-                    VALUES(@pid,'SPOT','Spot Charter',@o,@d,@cg,@kg,@fee,@rep,'OPEN',@day,@exp)",
-                    new { pid = p.Id, o = a.Name, d = b.Name, cg = cg.Code, kg, fee, rep, day, exp = day + 6 });
+                 c.Execute(@"INSERT INTO contracts(player_id,kind,client,origin,dest,cargo_code,weight_kg,fee,rep_required,status,created_day,expire_day,vehicle_class,quote_km,quote_rate,quote_mult)
+                     VALUES(@pid,'SPOT','Spot Charter',@o,@d,@cg,@kg,@fee,@rep,'OPEN',@day,@exp,@vc,@qkm,@qrate,@qmult)",
+                     new { pid = p.Id, o = a.Name, d = b.Name, cg = cg.Code, kg, fee, rep, day, exp = day + 6, vc = quote.VehicleClass, qkm = quote.BilledKm, qrate = (int)quote.Rate, qmult = quote.Market });
             }
             else
             {
-                fee = (long)(fee * 0.85);                      // borongan: margin sedang, cashflow pasti
+                fee = (long)(fee * EconomySvc.DedicatedDiscount);                      // borongan: margin sedang, cashflow pasti
                 int trips = R.Next(2, 7), months = R.Next(1, 13);
                 int rep = p.Tier == 2 ? R.Next(60, 201) : R.Next(150, 451);
                 string client = (p.Tier == 2 ? ClientsT2 : ClientsT3)[R.Next((p.Tier == 2 ? ClientsT2 : ClientsT3).Length)];
-                c.Execute(@"INSERT INTO contracts(player_id,kind,client,origin,dest,cargo_code,weight_kg,fee,rep_required,status,created_day,expire_day,months_total,trips_per_month,monthly_pay)
-                    VALUES(@pid,'DEDICATED',@client,@o,@d,@cg,@kg,@fee,@rep,'OPEN',@day,@exp,@months,@trips,@mp)",
-                    new { pid = p.Id, client, o = a.Name, d = b.Name, cg = cg.Code, kg, fee, rep, day, exp = day + 30, months, trips, mp = fee * trips });
+                c.Execute(@"INSERT INTO contracts(player_id,kind,client,origin,dest,cargo_code,weight_kg,fee,rep_required,status,created_day,expire_day,months_total,trips_per_month,monthly_pay,vehicle_class,quote_km,quote_rate,quote_mult)
+                    VALUES(@pid,'DEDICATED',@client,@o,@d,@cg,@kg,@fee,@rep,'OPEN',@day,@exp,@months,@trips,@mp,@vc,@qkm,@qrate,@qmult)",
+                    new { pid = p.Id, client, o = a.Name, d = b.Name, cg = cg.Code, kg, fee, rep, day, exp = day + 30, months, trips, mp = fee * trips, vc = quote.VehicleClass, qkm = quote.BilledKm, qrate = (int)quote.Rate, qmult = quote.Market });
             }
             return;
         }

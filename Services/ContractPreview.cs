@@ -39,7 +39,7 @@ public static class ContractPreview
             var pl = TripSvc.Build(p, t.Id, k.Id, 1.0, 0, "DENDA", "AUTO", "ANTRE");
             if (pl.Error != null) { errs.Add($"Truk [{t.Id}]: {pl.Error}"); continue; }
             f.FitTrucks++;
-            if (f.Best == null || pl.NetOk > f.Best.NetOk) f.Best = pl;
+            if (f.Best == null || pl.ContribEst > f.Best.ContribEst) f.Best = pl;
         }
         f.Ok = f.Best != null;
         if (!f.Ok) f.Reasons.AddRange(errs.Distinct());

@@ -56,6 +56,25 @@ public static class TripMenu
             Ui.Line();
             Console.WriteLine($"  {"LABA/RUGI TRIP",-31} {Accounting.Signed(lines.Sum(x => x.Amount)),20}");
         }
+
+                if (lines.Count > 0)
+        {
+            long cashNet = lines.Sum(x => x.Amount);
+            long share = info.Kind == "DEDICATED" ? info.MonthlyPay / Math.Max(1, info.TripsPerMonth) : 0;
+            Ui.Section("Ringkasan ekonomi (kas vs estimasi)");
+            Console.WriteLine($"  Kas trip (buku kas)            : {Accounting.Signed(cashNet)}");
+            if (share > 0) Console.WriteLine($"  Bagian bayaran borongan        : {Accounting.Signed(share)}   (cair bulanan, jika target tercapai)");
+            if (info.WearEst > 0 || info.OverheadEst > 0)
+            {
+                Console.WriteLine($"  Estimasi keausan               : {Accounting.Signed(-info.WearEst)}   (cadangan servis, BUKAN transaksi kas)");
+                long contrib = cashNet + share - info.WearEst;
+                Console.WriteLine($"  Kontribusi ekonomi trip        : {Accounting.Signed(contrib)}");
+                Console.WriteLine($"  Bagian overhead                : {Accounting.Signed(-info.OverheadEst)}   (alokasi biaya tetap bulanan)");
+                Console.WriteLine($"  Hasil setelah overhead         : {Accounting.Signed(contrib - info.OverheadEst)}");
+            }
+            else Console.WriteLine("  Estimasi keausan/overhead      : belum ada (trip dari sebelum v4).");
+        }
+        
         if (info.Status != "DONE")
             Console.WriteLine("  Catatan: trip masih berjalan, pendapatan & pengembalian UJ baru tercatat saat tiba.");
         if (info.Kind == "DEDICATED")

@@ -14,7 +14,7 @@ public static class PlayerSvc
         using var c = Db.Open();
         var p = c.QueryFirstOrDefault<Player>("SELECT * FROM players WHERE name=@name", new { name });
         if (p != null) return p;
-        c.Execute("INSERT INTO players(name,created_at,cash) VALUES(@name,@now,300000000)", new { name, now = DateTime.UtcNow });
+        c.Execute("INSERT INTO players(name,created_at,cash) VALUES(@name,@now,@cash)", new { name, now = DateTime.UtcNow, cash = EconomySvc.StartingCash });
         p = c.QueryFirst<Player>("SELECT * FROM players WHERE name=@name", new { name });
         HrSvc.Refresh(p.Id, false);
         WorldSvc.Daily(p.Id, 0);
