@@ -40,6 +40,7 @@ public static class WorldSvc
             {
                 c.Execute("INSERT INTO world_events(player_id,code,title,start_day,end_day,magnitude,cargos) VALUES(@pid,@code,@title,@s,@e,@mag,@cg)",
                                 new { pid, code = t.code, title = t.title, s = day, e = Rules.EventLastDay(day, t.days), mag = t.mag, cg = t.cargos });
+                Events.Append(c, null, "WORLD_EVENT", new { code = t.code, title = t.title, startDay = day, endDay = Rules.EventLastDay(day, t.days) }, pid);
                 if (t.cargos != "") ContractSvc.Refresh(pid, day, t.cargos.Split(','), 3);
             }
         }
@@ -67,6 +68,7 @@ public static class WorldSvc
             p = PlayerSvc.Get(pid);
             if (p.Bankrupt) return log;
         }
+        log.AddRange(DigestSvc.RunDue(pid));
         if (p.Manager) log.AddRange(ManagerSvc.Run(pid));
         return log;
     }

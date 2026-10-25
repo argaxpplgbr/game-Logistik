@@ -109,7 +109,7 @@ public static class DealerMenu
         foreach (var t in trucks)
         {
             string eta = t.BodyReadyAt != null
-                ? $"selesai {(t.BodyReadyAt.Value - DateTime.UtcNow).TotalMinutes:0.0} menit lagi" : "menunggu dipasang bak";
+                ? $"selesai {(t.BodyReadyAt.Value - SimClock.Now).TotalMinutes:0.0} menit lagi" : "menunggu dipasang bak";
             Console.WriteLine($"  Truk [{t.Id}] {t.ModelName}  -  {t.Status}, {eta}");
         }
         if (!trucks.Any(x => x.Status == "WAIT_BODY")) return;

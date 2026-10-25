@@ -35,6 +35,7 @@ public static class FinanceSvc
         using var c = Db.Open(); using var tx = c.BeginTransaction();
         c.Execute("INSERT INTO loans(player_id,principal,remaining,installment,months_left) VALUES(@pid,@amount,@rem,@inst,@months)", new { pid, amount, rem = inst * months, inst, months }, tx);
         Db.Post(c, tx, pid, amount, "PINJAMAN_CAIR", $"Pinjaman {months} bulan");
+        Events.Append(c, tx, "LOAN_TAKEN", new { amount, months, installment = inst }, pid);
         tx.Commit();
         return $"Pinjaman {Rules.Rp(amount)} cair. Cicilan {Rules.Rp(inst)}/bulan x {months} = total bayar {Rules.Rp(inst * months)}. Gagal bayar = truk disita!";
     }
@@ -67,15 +68,15 @@ public static class FinanceSvc
     }
 
     // Biaya tetap per bulan (gaji+BPJS+staf TANPA tunggakan, sewa, premi, cicilan) + jumlah truk. Untuk alokasi overhead trip.
-    static (int pid, DateTime at, long fixedMonthly, int trucks) _fixedCache;
+    static (int pid, int gen, DateTime at, long fixedMonthly, int trucks) _fixedCache;
     public static (long fixedMonthly, int trucks) FixedMonthly(Player p, bool fresh = false)
     {
         var cc = _fixedCache;
-        if (!fresh && cc.pid == p.Id && (DateTime.UtcNow - cc.at).TotalSeconds < 5) return (cc.fixedMonthly, cc.trucks);
+        if (!fresh && cc.pid == p.Id && cc.gen == Db.Generation && (DateTime.UtcNow - cc.at).TotalSeconds < 5) return (cc.fixedMonthly, cc.trucks);
         var fleet = FleetSvc.Fleet(p.Id); var staff = HrSvc.Staff(p.Id);
         var bills = ComputeBills(p, fleet, staff, PlayerSvc.Day(p));
         long fixedM = Math.Max(0, bills.Payroll - p.Arrears) + bills.Rent + bills.Premium + Loans(p.Id).Sum(l => l.Installment);
-        _fixedCache = (p.Id, DateTime.UtcNow, fixedM, fleet.Count);
+        _fixedCache = (p.Id, Db.Generation, DateTime.UtcNow, fixedM, fleet.Count);
         return (fixedM, fleet.Count);
     }
 
@@ -154,7 +155,7 @@ public static class FinanceSvc
             foreach (var d in staff)
             {
                 bool quit = d.Status == "IDLE" && R.NextDouble() < 0.2;
-                c.Execute("UPDATE drivers SET morale=GREATEST(0,morale-20),status=@s WHERE id=@id", new { s = quit ? "QUIT" : d.Status, id = d.Id }, tx);
+                c.Execute("UPDATE drivers SET morale=MAX(0,morale-20),status=@s WHERE id=@id", new { s = quit ? "QUIT" : d.Status, id = d.Id }, tx);
                 if (quit) { c.Execute("UPDATE trucks SET driver_id=NULL WHERE driver_id=@id", new { id = d.Id }, tx); log.Add($"{d.Name} resign karena gaji telat."); }
             }
         }
@@ -189,6 +190,7 @@ public static class FinanceSvc
                     long v = (long)(Rules.TruckValue(vic, day) * 0.7); remaining -= v; seized.Add(vic.Id);
                     c.Execute("UPDATE trucks SET status='TOTALLOSS',driver_id=NULL WHERE id=@id", new { id = vic.Id }, tx);
                     log.Add($"BANK MENYITA {vic.ModelName}! Sisa utang dikurangi {Rules.Rp(v)}.");
+                    Events.Append(c, tx, "TRUCK_SEIZED", new { model = vic.ModelName, amount = v }, pid);
                     missed = 1;
                 }
             }
@@ -198,9 +200,10 @@ public static class FinanceSvc
         }
         if (Rules.IsCashBankrupt(cash)) bankrupt = true;
         double pen = Math.Max(1.0, p.PremiumPenalty - 0.05);
-
+        Events.Append(c, tx, "MONTH_CLOSED", new { cash, payrollPaid = arrears == 0, bankrupt, closeDay = day }, pid);
+        
         c.Execute(@"UPDATE players SET arrears=@arr,premium_penalty=@pen,bankrupt=@b,
-            rep_delivery=GREATEST(0,LEAST(400,rep_delivery+@rep)) WHERE id=@pid",
+            rep_delivery=MAX(0,LEAST(400,rep_delivery+@rep)) WHERE id=@pid",
             new { arr = arrears, pen, b = bankrupt, rep = repD, pid }, tx);
         tx.Commit();
         log.Add($"Saldo akhir setelah tutup buku: {Rules.Rp(cash)}.");

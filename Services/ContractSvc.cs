@@ -110,6 +110,7 @@ public static class ContractSvc
         if (p.Reputation < k.RepRequired) return $"Reputasi kurang! Butuh {k.RepRequired}, kamu {p.Reputation}. Uang top-up tidak bisa membeli rating.";
         if (c.ExecuteScalar<int>("SELECT COUNT(*) FROM contracts WHERE player_id=@pid AND kind='DEDICATED' AND status='ACTIVE'", new { pid }) >= 4) return "Maksimal 4 kontrak borongan aktif.";
         if (c.Execute("UPDATE contracts SET status='ACTIVE' WHERE id=@id AND player_id=@pid AND status='OPEN'", new { id, pid }) != 1) return "Kontrak sudah tidak tersedia.";
+        Events.Append(c, null, "CONTRACT_ACCEPTED", new { client = k.Client, origin = k.Origin, dest = k.Dest, monthlyPay = k.MonthlyPay, months = k.MonthsTotal }, pid);
         return $"Kontrak {k.Client} diterima: {k.TripsPerMonth} trip/bulan selama {k.MonthsTotal} bulan, bayar {Rules.Rp(k.MonthlyPay)}/bulan.";
     }
 }

@@ -14,14 +14,14 @@ public static class PlayerSvc
         using var c = Db.Open();
         var p = c.QueryFirstOrDefault<Player>("SELECT * FROM players WHERE name=@name", new { name });
         if (p != null) return p;
-        c.Execute("INSERT INTO players(name,created_at,cash) VALUES(@name,@now,@cash)", new { name, now = DateTime.UtcNow, cash = EconomySvc.StartingCash });
+        c.Execute("INSERT INTO players(name,created_at,cash) VALUES(@name,@now,@cash)", new { name, now = SimClock.Now, cash = EconomySvc.StartingCash });
         p = c.QueryFirst<Player>("SELECT * FROM players WHERE name=@name", new { name });
         HrSvc.Refresh(p.Id, false);
         WorldSvc.Daily(p.Id, 0);
         return p;
     }
 
-    public static int Day(Player p) => (int)((DateTime.UtcNow - p.CreatedAt).TotalMinutes / Rules.DayMinutes);
+    public static int Day(Player p) => (int)((SimClock.Now - p.CreatedAt).TotalMinutes / Rules.DayMinutes);
 
         static string Spend(int id, long cost, string setSql, string ok)
     {
@@ -32,6 +32,17 @@ public static class PlayerSvc
         return ok;
     }
 
+    static string TierEvent(int id, int oldTier, string msg)
+    {
+        var np = Get(id);
+        if (np.Tier > oldTier)
+        {
+            using var c = Db.Open();
+            Events.Append(c, null, "TIER_UPGRADED", new { company = np.Name, tier = np.Tier, legal = np.Legal }, id);
+        }
+        return msg;
+    }
+
     // ---- Tier / legalitas ----
     public static string UpgradeTier(int id)
     {
@@ -39,13 +50,13 @@ public static class PlayerSvc
         if (p.Tier == 1)
         {
             if (p.Reputation < 50) return "Butuh reputasi minimal 50 (0,5 bintang) dari pengiriman sukses.";
-            return Spend(id, 150_000_000, "tier=2", "Resmi menjadi CV (izin KIU/KIR). Engkel, Double & Medium Duty terbuka!");
+            return TierEvent(id, p.Tier, Spend(id, 150_000_000, "tier=2", "Resmi menjadi CV (izin KIU/KIR). Engkel, Double & Medium Duty terbuka!"));
         }
         if (p.Tier == 2)
         {
             if (p.Reputation < 250) return "Butuh reputasi minimal 250 (2,5 bintang).";
             if (p.PoolType == "NONE") return "Butuh Pool (sewa/milik) dulu.";
-            return Spend(id, 1_200_000_000, "tier=3", "Resmi menjadi PT (SMK lengkap). Tronton, Trailer, antar-pulau terbuka!");
+            return TierEvent(id, p.Tier, Spend(id, 1_200_000_000, "tier=3", "Resmi menjadi PT (SMK lengkap). Tronton, Trailer, antar-pulau terbuka!"));
         }
         return "Sudah di tier tertinggi.";
     }
@@ -149,7 +160,7 @@ public static class PlayerSvc
         if (idx < 0 || idx >= Packs.Length) return "Paket tidak ada.";
         var pk = Packs[idx]; using var c = Db.Open(); using var tx = c.BeginTransaction();
         c.Execute("INSERT INTO topups(player_id,pack,cash,price_idr,created_at) VALUES(@id,@n,@cash,@idr,@now)",
-            new { id, n = pk.name, cash = pk.cash, idr = pk.idr, now = DateTime.UtcNow }, tx);
+            new { id, n = pk.name, cash = pk.cash, idr = pk.idr, now = SimClock.Now }, tx);
         Db.Post(c, tx, id, pk.cash, "TOPUP_SIMULASI", pk.name);
         tx.Commit();
         return $"[SIMULASI bayar Rp {pk.idr:N0}] +{Rules.Rp(pk.cash)}. Ingat: rating/reputasi tidak bisa dibeli, kontrak kelas atas tetap terkunci.";
@@ -166,7 +177,7 @@ public static class PlayerSvc
         using var c = Db.Open();
         var it = c.QueryFirstOrDefault<Cosmetic>("SELECT * FROM cosmetics WHERE id=@itemId", new { itemId });
         if (it == null) return "Item tidak ada.";
-        c.Execute("INSERT IGNORE INTO owned_cosmetics(player_id,item_id) VALUES(@pid,@itemId)", new { pid, itemId });
+        c.Execute("INSERT OR IGNORE INTO owned_cosmetics(player_id,item_id) VALUES(@pid,@itemId)", new { pid, itemId });
                 return $"[SIMULASI] {it.Name} dimiliki. Harga Rp {it.PriceIdr:N0} hanya contoh (belum ada pembayaran sungguhan), kas game tidak dipotong. Pasang lewat menu Armada.";
     }
 
@@ -190,7 +201,7 @@ public static class PlayerSvc
         if (kind == "CV") { HrSvc.Refresh(pid, false); return "Daftar CV supir diperbarui gratis."; }
         var t = FleetSvc.One(truckId);
         if (t == null || t.PlayerId != pid || t.Status != "KAROSERI" || t.BodyReadyAt == null) return "Truk tidak sedang di karoseri.";
-        var now = DateTime.UtcNow; var rem = t.BodyReadyAt.Value - now;
+        var now = SimClock.Now; var rem = t.BodyReadyAt.Value - now;
         c.Execute("UPDATE trucks SET body_ready_at=@r WHERE id=@truckId", new { r = now + rem / 2, truckId });
         return "Pengerjaan karoseri dipercepat 50%.";
     }

@@ -20,7 +20,7 @@ public static class MainMenu
 
         Ui.Title("Nusantara Logistics Manager");
         Console.WriteLine($"  Perusahaan : {p.Name} ({p.Legal})");
-        Console.WriteLine($"  Hari ke    : {day}");
+        
         Console.WriteLine($"  Kas        : {Rules.Rp(p.Cash)}");
         Console.WriteLine($"  Rating     : {p.Stars:0.0} bintang (reputasi {p.Reputation})");
         Console.WriteLine($"  Armada     : {trucks}/{FleetSvc.MaxTrucks(p.Tier)} truk");
@@ -36,7 +36,10 @@ public static class MainMenu
             Ui.Section("BERITA AKTIF");
             foreach (var e in events) Console.WriteLine($"  [BERITA] {e.Title}");
         }
-
+        var latest = NewsSvc.Latest(3);
+        if(latest.Count > 0) { Ui.Section("BERITA TERBARU"); 
+        foreach (var n in latest)
+        Console.WriteLine($" [{n.Category}]{n.Headline}");}
         var hint = TutorialSvc.Hint(pid);
         if (hint != null)
         {
@@ -59,6 +62,7 @@ public static class MainMenu
             "Buku Kas & Laporan",
             "Keuangan & Tutup Buku",
             "Panduan Pemula"
-        }, "Keluar");
+        }, "Kembali ke slot simpan");
+        Console.WriteLine("  [P] Jeda/Lanjut waktu   [S] Simpan + cadangan   [V] Kecepatan waktu");
     }
 }

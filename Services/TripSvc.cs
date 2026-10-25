@@ -1,6 +1,6 @@
 using System.Data;
 using Dapper;
-using MySqlConnector;
+using Microsoft.Data.Sqlite;
 using Nusantara.Database;
 using Nusantara.Models;
 
@@ -146,7 +146,7 @@ public static class TripSvc
             return "Biaya berubah sejak preview (harga, event, atau kondisi). Tidak ada yang dipotong, silakan buat preview baru.";
 
         long need = pl.UjGiven + pl.Escort + pl.Security;
-        var now = DateTime.UtcNow; var arrive = now.AddMinutes(pl.Minutes / Rules.DevSpeed);
+        var now = SimClock.Now; var arrive = now.AddMinutes(pl.Minutes / Rules.DevSpeed);
         long tripFee = pl.Contract.Kind == "SPOT" ? pl.Contract.Fee : 0;
         string notes = string.Join(" ", pl.Notes); if (notes.Length > 480) notes = notes[..480];
         int tripId = 0;
@@ -178,7 +178,8 @@ public static class TripSvc
                       kr = pl.RoadKm, kf = pl.FerryKm, st = pl.Steep, uj = pl.UjGiven, ce = pl.CostEst, fc = pl.FuelCost, fee = tripFee,
                       ol = pl.OverloadPct, pol = pl.Policy, sec = pl.Sec, fm = pl.FuelMode, ft = pl.FuelType, um = pl.UjMult, now, arr = arrive,
                       notes, ins = pl.Truck.Insurance, ci = pl.Truck.CargoIns, we = pl.WearEst, oe = pl.OverheadEst }, tx);
-            tripId = c.ExecuteScalar<int>("SELECT LAST_INSERT_ID()", transaction: tx);
+            tripId = c.ExecuteScalar<int>("SELECT LAST_INSERT_rowid()", transaction: tx);
+            Events.Append(c, tx, "TRIP_DISPATCHED", new { tripId, truck = pl.Truck.ModelName, origin = pl.Contract.Origin, dest = pl.Contract.Dest, kind = pl.Contract.Kind }, p.Id);
 
             // UJ dan biaya awal keluar SEKALI di sini; hasil trip hanya mengembalikan sisa / menagih kekurangan.
             string rute = $"{pl.Contract.Origin}->{pl.Contract.Dest}";
@@ -188,11 +189,11 @@ public static class TripSvc
                 return $"Kas kurang. Butuh {Rules.Rp(need)} (UJ + biaya lain). Tidak ada yang berubah.";
             tx.Commit();
         }
-        catch (MySqlException ex)
+        catch (SqliteException ex)
         {
             return "Gagal menyimpan perjalanan, tidak ada yang berubah (uang tidak dipotong): " + ex.Message;
         }
-        return $"{pl.Truck.ModelName} berangkat ke {pl.Contract.Dest} (supir {pl.Driver.Name}), trip #{tripId}. UJ {Rules.Rp(pl.UjGiven)}. Tiba ~{pl.Minutes / Rules.DevSpeed:0.#} menit real-time. Laporan: menu Perjalanan > ID {tripId}.";
+        return $"{pl.Truck.ModelName} berangkat ke {pl.Contract.Dest} (supir {pl.Driver.Name}), trip #{tripId}. UJ {Rules.Rp(pl.UjGiven)}. Tiba ~{pl.Minutes / Rules.DevSpeed:0.#} menit waktu game. Laporan: menu Perjalanan > ID {tripId}.";
     }
 
     public static List<Trip> Running(int pid)
@@ -209,11 +210,11 @@ public static class TripSvc
     public static List<string> CompleteTrips(int pid)
     {
         var log = new List<string>(); using var c = Db.Open();
-        var due = c.Query<Trip>("SELECT * FROM trips WHERE player_id=@pid AND status='RUNNING' AND arrive_at<=@now", new { pid, now = DateTime.UtcNow }).ToList();
+        var due = c.Query<Trip>("SELECT * FROM trips WHERE player_id=@pid AND status='RUNNING' AND arrive_at<=@now", new { pid, now = SimClock.Now }).ToList();
         foreach (var t in due)
         {
             try { log.AddRange(Resolve(t)); }
-            catch (MySqlException ex) { log.Add($"Gagal memproses trip #{t.Id} ({ex.Message}). Akan dicoba lagi."); }
+            catch (SqliteException ex) { log.Add($"Gagal memproses trip #{t.Id} ({ex.Message}). Akan dicoba lagi."); }
         }
         return log;
     }
@@ -340,10 +341,11 @@ public static class TripSvc
 
         long tripNet = c.ExecuteScalar<long>("SELECT COALESCE(SUM(amount),0) FROM ledger WHERE trip_id=@id AND player_id=@pid", new { id = t.Id, pid = p.Id }, tx);
         log.Add($"Laba/rugi trip #{t.Id} (termasuk UJ & biaya berangkat): {Accounting.Signed(tripNet)}.");
+        Events.Append(c, tx, "TRIP_COMPLETED", new { tripId = t.Id, truck = truck.ModelName, origin = ct.Origin, dest = ct.Dest, ok, income, net = tripNet, total, stolen, incident, quit }, p.Id);
         if (ct.Kind != "SPOT")
             log.Add($"Pendapatan borongan (setara {Rules.Rp(ct.MonthlyPay / Math.Max(1, ct.TripsPerMonth))} per trip) cair saat tutup buku, bukan sekarang.");
 
-        c.Execute("UPDATE players SET rep_delivery=GREATEST(0,LEAST(400,rep_delivery+@rep)),deliveries_ok=deliveries_ok+@ok,premium_penalty=@pen WHERE id=@id",
+        c.Execute("UPDATE players SET rep_delivery=MAX(0,MIN(400,rep_delivery+@rep)),deliveries_ok=deliveries_ok+@ok,premium_penalty=@pen WHERE id=@id",
             new { rep = repD, ok = ok ? 1 : 0, pen = newPen, id = p.Id }, tx);
         if (total) c.Execute("UPDATE trucks SET status='TOTALLOSS',driver_id=NULL WHERE id=@id", new { id = truck.Id }, tx);
         else

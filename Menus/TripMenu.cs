@@ -17,7 +17,7 @@ public static class TripMenu
             {
                 Console.WriteLine();
                 Console.WriteLine($"Trip #{t.Id} (truk {t.TruckId})");
-                Console.WriteLine($"     Tiba   : {(t.ArriveAt - DateTime.UtcNow).TotalMinutes:0.0} menit lagi");
+                Console.WriteLine($"     Tiba   : {(t.ArriveAt - SimClock.Now).TotalMinutes:0.0} menit lagi");
                 Console.WriteLine($"     UJ     : {Rules.Rp(t.UjGiven)}");
                 if (t.Notes != "") Console.WriteLine($"     Catatan: {t.Notes}");
             }

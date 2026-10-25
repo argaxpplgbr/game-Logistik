@@ -70,6 +70,7 @@ public static class FleetSvc
         c.Execute(@"INSERT INTO trucks(player_id,catalog_id,body_code,status,fuel_pref,purchase_price,bought_day)
             VALUES(@pid,@modelId,@body,@status,@fuel,@price,@day)",
             new { pid, modelId, body = m.FactoryBody, status, fuel = m.FuelReq == "DEX" ? "DEX" : "BIO", price = m.Price, day = PlayerSvc.Day(p) }, tx);
+            Events.Append(c, tx, "TRUCK_BOUGHT", new {company = p.Name, model = m.Name, price = m.Price, used = false}, pid);
         tx.Commit();
         return m.FactoryBody == null ? $"{m.Name} dibeli (chassis+kabin). Bawa ke Karoseri untuk pasang bak!" : $"{m.Name} dibeli & siap jalan (butuh supir).";
     }
@@ -82,19 +83,20 @@ public static class FleetSvc
         if (t.Status != "WAIT_BODY") return "Truk ini tidak sedang menunggu bak.";
         if (b.WeightKg >= t.MaxLoad) return "Bak terlalu berat untuk chassis ini.";
         long cost = (long)(b.Price * (1 + t.MaxLoad / 20000.0));
-        var ready = DateTime.UtcNow.AddMinutes(b.Days * Rules.DayMinutes);
+        var ready = SimClock.Now.AddMinutes(b.Days * Rules.DayMinutes);
         using var tx = c.BeginTransaction();
         if (!Db.Spend(c, tx, pid, cost)) return $"Uang kurang ({Rules.Rp(cost)}).";
         if (c.Execute("UPDATE trucks SET status='KAROSERI',body_code=@code,body_ready_at=@ready WHERE id=@truckId AND player_id=@pid AND status='WAIT_BODY'",
                 new { code, ready, truckId, pid }, tx) != 1) return "Truk ini tidak sedang menunggu bak.";
         tx.Commit();
+        Events.Append(c, null, "BODY_INSTALL_STARTED", new { company = p.Name, model = t.ModelName, body = b.Name, cost, days = b.Days }, pid);
         return $"{b.Name} dipasang ke truk {truckId}: {Rules.Rp(cost)}, selesai {b.Days} hari game.";
     }
 
     public static void FinishBodies(int pid)
     {
         using var c = Db.Open();
-        c.Execute("UPDATE trucks SET status='IDLE',body_ready_at=NULL WHERE player_id=@pid AND status='KAROSERI' AND body_ready_at<=@now", new { pid, now = DateTime.UtcNow });
+        c.Execute("UPDATE trucks SET status='IDLE',body_ready_at=NULL WHERE player_id=@pid AND status='KAROSERI' AND body_ready_at<=@now", new { pid, now = SimClock.Now });
     }
 
     // ---- Pasar truk bekas ----
@@ -135,6 +137,7 @@ public static class FleetSvc
         c.Execute(@"INSERT INTO trucks(player_id,catalog_id,body_code,status,oil_pct,brake_pct,tire_pct,filter_pct,engine_pct,fuel_pref,purchase_price,bought_day,is_used)
             VALUES(@pid,@cid,@body,'IDLE',@o,@b,@t,@f,@e,@fuel,@price,@day,1)",
             new { pid, cid = l.CatalogId, body = l.BodyCode, o = l.OilPct, b = l.BrakePct, t = l.TirePct, f = l.FilterPct, e = l.EnginePct, fuel = l.FuelReq == "DEX" ? "DEX" : "BIO", price = l.Price, day = PlayerSvc.Day(p) }, tx);
+            Events.Append(c, tx, "TRUCK_BOUGHT", new { company = p.Name, model = l.ModelName, price = l.Price, used = true }, pid);
         if (c.Execute("DELETE FROM used_listings WHERE id=@id AND player_id=@pid", new { id, pid }, tx) != 1) return "Listing sudah tidak ada.";
         tx.Commit();
         return $"{l.ModelName} bekas dibeli. Komponen sudah aus, cek & servis dulu!";
@@ -157,6 +160,7 @@ public static class FleetSvc
             return "Truk harus berstatus IDLE untuk servis.";
         c.Execute("UPDATE players SET ad_discount=0 WHERE id=@pid", new { pid }, tx);
         tx.Commit();
+        Events.Append(c, null, "TRUCK_SERVICED", new { model = t.ModelName, parts = list, cost}, pid, news: false);
         return $"Servis {string.Join("+", list)} {t.ModelName}: {Rules.Rp(cost)} ({(mech ? "mekanik tetap" : "mekanik panggilan")}).";
     }
 

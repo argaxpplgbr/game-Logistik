@@ -60,7 +60,7 @@ public static class LedgerSvc
     public static List<LedgerSum> Summary(int pid, int fromDay)
     {
         using var c = Db.Open();
-        return c.Query<LedgerSum>(@"SELECT category, CAST(SUM(amount) AS SIGNED) total FROM ledger
+        return c.Query<LedgerSum>(@"SELECT category, CAST(SUM(amount) AS INTEGER) total FROM ledger
             WHERE player_id=@pid AND game_day>=@fromDay AND category<>'SALDO_AWAL' GROUP BY category ORDER BY total", new { pid, fromDay }).ToList();
     }
 
@@ -82,7 +82,7 @@ public static class LedgerSvc
     public static (long sum, long cash) Reconcile(int pid)
     {
         using var c = Db.Open();
-        long sum = c.ExecuteScalar<long>("SELECT CAST(COALESCE(SUM(amount),0) AS SIGNED) FROM ledger WHERE player_id=@pid", new { pid });
+        long sum = c.ExecuteScalar<long>("SELECT CAST(COALESCE(SUM(amount),0) AS INTEGER) FROM ledger WHERE player_id=@pid", new { pid });
         long cash = c.ExecuteScalar<long>("SELECT cash FROM players WHERE id=@pid", new { pid });
         return (sum, cash);
     }
