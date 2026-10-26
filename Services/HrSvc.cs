@@ -61,7 +61,7 @@ public static class HrSvc
         long sal = d.SalaryExp * offerPct / 100; int morale = Rules.Clamp(60 + (offerPct - 100), 20, 95);
         int n = c.Execute("UPDATE drivers SET status='IDLE',salary=@sal,morale=@morale WHERE id=@id AND status='CANDIDATE'", new { sal, morale, id });
         if (n == 0) return "Kandidat tidak ada.";
-        Events.Append(c, null, "DRIVER_FIRED", new {name = d.Name, sim = d.Sim, salary = sal}, pid);
+        Events.Append(c, null, EventTypes.DriverHired, new { name = d.Name, sim = d.Sim, salary = sal }, pid);
         long monthly = sal + (long)(sal * 0.1024);
         return $"{d.Name} (SIM {d.Sim}) diterima. Gaji {Rules.Rp(sal)}/bln + BPJS (beban tetap {Rules.Rp(monthly)}/bln), komisi {d.CommissionPct}%.";
     }
@@ -72,7 +72,7 @@ public static class HrSvc
         int n = c.Execute("UPDATE drivers SET status='QUIT' WHERE id=@id AND player_id=@pid AND status='IDLE'", new { id, pid });
         if (n == 0) return "Supir tidak ada / sedang jalan.";
         c.Execute("UPDATE trucks SET driver_id=NULL WHERE driver_id=@id", new { id });
-        Events.Append(c, null, "DRIVER_FIRED", new { name = c.ExecuteScalar<string>("SELECT name FROM drivers WHERE id=@id", new { id }) ?? "supir" }, pid);
+        Events.Append(c, null, EventTypes.DriverFired, new { name = c.ExecuteScalar<string>("SELECT name FROM drivers WHERE id=@id", new { id }) ?? "supir" }, pid);
         return "Supir diberhentikan.";
     }
 

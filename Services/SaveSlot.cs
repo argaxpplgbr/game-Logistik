@@ -127,7 +127,7 @@ public static class SaveSlots
             SimClock.Load(0, 1);
             var p = PlayerSvc.GetOrCreate(name);
             LedgerSvc.EnsureOpening(p.Id);
-            using(var ce = Db.Open()) Events.Append(ce, null,"COMPANY_FOUNDER", new {company = p.Name, cash = p.Cash}, p.Id);
+            using (var ce = Db.Open()) Events.Append(ce, null, EventTypes.CompanyFounded, new { company = p.Name, cash = p.Cash }, p.Id);
             CurrentNo = no; CurrentPlayerId = p.Id;
             Persist();
             return p.Id;
