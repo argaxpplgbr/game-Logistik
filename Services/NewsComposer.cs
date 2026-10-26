@@ -104,6 +104,11 @@ public static class NewsComposer
                     Str(e, "title"),
                     $"Kejadian simulasi, berlaku hari {Num(e, "startDay")} sampai {Num(e, "endDay")}.");
 
+            case "CONTRACT_AWARDED":
+                return new NewsDraft("PASAR",
+                    $"{Str(e, "company")} memenangkan kontrak {Str(e, "origin")} - {Str(e, "dest")}",
+                    $"Klien {Str(e, "client")}, harga {Rules.Rp(Num(e, "price"))}, {Num(e, "bidders")} penawar. {Str(e, "reason")}");
+
             default:
                 return null;   // TRUCK_SERVICED dan tipe lain: hanya tercatat di buku kejadian
         }

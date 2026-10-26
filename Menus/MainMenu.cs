@@ -61,7 +61,8 @@ public static class MainMenu
             "Toko",
             "Buku Kas & Laporan",
             "Keuangan & Tutup Buku",
-            "Panduan Pemula"
+            "Panduan Pemula",
+            "pasar bersama (kontrak & pesaing)"
         }, "Kembali ke slot simpan");
         Console.WriteLine("  [P] Jeda/Lanjut waktu   [S] Simpan + cadangan   [V] Kecepatan waktu");
     }

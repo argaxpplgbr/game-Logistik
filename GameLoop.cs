@@ -11,7 +11,7 @@ public static class GameLoop
         while (true)
         {
             List<string> msgs;
-            try { msgs = WorldSvc.Tick(pid); }
+            try { msgs = WorldSvc.Tick(pid); msgs.AddRange(MarketSvc.RunDaily()); }
             catch (Exception ex) { msgs = new List<string> { "Kesalahan saat memproses waktu game: " + ex.Message }; }
 
             SaveSlots.Persist();   // simpan otomatis jam game tiap siklus
@@ -43,6 +43,7 @@ public static class GameLoop
                 case "11": LedgerMenu.Run(pid); break;
                 case "12": FinanceMenu.Run(pid); break;
                 case "13": TutorialMenu.Run(pid); break;
+                case "14": MarketMenu.Run(pid); break;
 
                 case "p":
                     if (SimClock.Paused) { SimClock.Resume(); Console.WriteLine("  Waktu game berjalan lagi."); }

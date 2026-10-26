@@ -61,7 +61,7 @@ public class EventTypeTests : IDisposable
     [Fact]
     public void Composer_has_a_template_for_every_standard_type_except_silent_ones()
     {
-        var silent = new HashSet<string> { EventTypes.TruckServiced };
+        var silent = new HashSet<string> { EventTypes.TruckServiced, EventTypes.BidPlaced };
         var empty = JsonDocument.Parse("{}").RootElement.Clone();
         foreach (var t in EventTypes.All)
         {

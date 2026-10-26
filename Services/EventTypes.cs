@@ -17,6 +17,8 @@ public static class EventTypes
     public const string TruckSeized = "TRUCK_SEIZED";
     public const string TierUpgraded = "TIER_UPGRADED";
     public const string WorldEvent = "WORLD_EVENT";
+    public const string BidPlaced = "BID_PLACED";
+    public const string ContractAwarded = "CONTRACT_AWARDED";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {

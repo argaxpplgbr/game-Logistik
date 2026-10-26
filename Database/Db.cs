@@ -37,7 +37,9 @@ public static class Db
     static readonly Migration[] Migrations =
     {
         new(1, "skema_dasar_sqlite", SchemaSqlite.V1),
-        new(2, "event_ledger_berita", SchemaV2.Sql)
+        new(2, "event_ledger_berita", SchemaV2.Sql),
+        new(3, "kesehatan_save_dan_job_log", SchemaV3.Sql),
+        new(4, "perusahaan_ai_dan_pasar_bersama", SchemaV4.Sql)
     };
 
     static string? connStr;
