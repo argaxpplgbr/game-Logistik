@@ -269,8 +269,9 @@ public static class MarketSvc
             }
             if (!claimed) continue;
 
-            log.AddRange(Settle(d));    // 1) tetapkan pemenang dari penawaran yang sudah ditutup
-            Refresh(d);                 // 2) kedaluwarsakan yang lama, buat peluang baru
+            log.AddRange(Settle(d));    
+            Refresh(d); 
+            AiCompanySvc.RunAll(d);               
         }
         return log;
     }

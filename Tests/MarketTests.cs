@@ -22,10 +22,12 @@ public class MarketTests : IDisposable
         oldStamp = SimClock.Stamp;
         long fake = 1_000;
         SimClock.Stamp = () => fake;
+        AiCompanySvc.Enabled = false;
     }
 
     public void Dispose()
     {
+        AiCompanySvc.Enabled = true;
         SaveSlots.Shutdown();
         SimClock.Unload();
         SimClock.Stamp = oldStamp;
