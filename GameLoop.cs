@@ -104,16 +104,20 @@ public static class GameLoop
                     CompanyChatMenu.Run(pid);
                     break;
 
+                case "16":
+                    CompetitorMenu.Run(pid);
+                    break;
+
                 case "p":
                     if (SimClock.Paused)
                     {
                         SimClock.Resume();
-                        Console.WriteLine(
-                            "  Waktu game berjalan lagi.");
+                        Console.WriteLine("  Waktu game berjalan lagi.");
                     }
                     else
                     {
                         SimClock.Pause();
+
                         Console.WriteLine(
                             "  Waktu game DIJEDA. Menu tetap bisa dipakai, " +
                             "tapi jam, perjalanan, dan tagihan berhenti.");

@@ -15,13 +15,15 @@ public static class CompanyChatMenu
         {
             Ui.Title("Komunikasi Antar Perusahaan");
 
-            Console.WriteLine("  1. Lihat pesan masuk");
-            Console.WriteLine("  2. Kirim pesan");
-            Console.WriteLine("  0. Kembali");
+            Ui.Options(new[]
+            {
+                "Lihat pesan masuk",
+                "Kirim pesan",
+                "Lihat hubungan perusahaan",
+                "Lihat perjanjian"
+            });
 
-            string choice = Ui.Ask("\nPilih: ");
-
-            switch (choice)
+            switch (Ui.Ask("Pilih: "))
             {
                 case "1":
                     ShowInbox(playerId);
@@ -31,12 +33,16 @@ public static class CompanyChatMenu
                     Send(playerId);
                     break;
 
+                case "3":
+                    ShowRelations(playerId);
+                    break;
+
+                case "4":
+                    ShowAgreements(playerId);
+                    break;
+
                 case "0":
                     return;
-
-                default:
-                    Console.WriteLine("Pilihan tidak tersedia.");
-                    break;
             }
         }
     }
@@ -54,13 +60,9 @@ public static class CompanyChatMenu
             return;
         }
 
-        using var c = Db.Open();
-
         foreach (var m in messages)
         {
-            string sender = c.ExecuteScalar<string>(
-                "SELECT name FROM players WHERE id=@id",
-                new { id = m.SenderId }) ?? "Perusahaan tidak dikenal";
+            string sender = AiSocialSvc.CompanyName(m.SenderId);
 
             Console.WriteLine();
             Ui.Line();
@@ -81,13 +83,6 @@ public static class CompanyChatMenu
             bool accept = Ui.Yes("Terima pesan/tawaran ini? (y/n): ");
 
             string reply = Ui.Ask("Balasan: ");
-
-            if (string.IsNullOrWhiteSpace(reply))
-            {
-                reply = accept
-                    ? "Kami menerima pesan Anda."
-                    : "Kami belum dapat menerima tawaran tersebut.";
-            }
 
             bool result = AiSocialSvc.Respond(
                 playerId,
@@ -154,7 +149,8 @@ ORDER BY kind, name
         Console.WriteLine("  3. Penawaran aliansi");
         Console.WriteLine("  4. Kerja sama rahasia (simulasi)");
         Console.WriteLine("  5. Tantangan persaingan");
-        Console.WriteLine("  6. Ancaman dalam game");
+        Console.WriteLine("  6. Tawaran gencatan");
+        Console.WriteLine("  7. Ancaman dalam game");
 
         int type = Ui.Num("\nPilih jenis pesan: ", -1);
 
@@ -165,7 +161,8 @@ ORDER BY kind, name
             3 => "ALLIANCE_OFFER",
             4 => "COVERT_OFFER",
             5 => "COMPETITIVE_PROPOSAL",
-            6 => "THREAT",
+            6 => "TRUCE_OFFER",
+            7 => "THREAT",
             _ => ""
         };
 
@@ -200,6 +197,64 @@ ORDER BY kind, name
         catch (Exception ex)
         {
             Console.WriteLine("\nGagal mengirim pesan: " + ex.Message);
+        }
+
+        Ui.Pause();
+    }
+
+    private static void ShowRelations(int playerId)
+    {
+        Ui.Title("Hubungan Perusahaan");
+
+        var relations = AiSocialSvc.Relationships(playerId);
+
+        if (relations.Count == 0)
+        {
+            Ui.Empty("Belum ada hubungan perusahaan.");
+            Ui.Pause();
+            return;
+        }
+
+        foreach (var r in relations)
+        {
+            Console.WriteLine();
+            Console.WriteLine($"  {r.OtherCompanyName}");
+            Console.WriteLine($"  Status       : {r.RelationStatus}");
+            Console.WriteLine($"  Kepercayaan  : {r.Trust}/100");
+            Console.WriteLine($"  Penghormatan : {r.Respect}/100");
+            Console.WriteLine($"  Keluhan      : {r.Grievance}/100");
+            Console.WriteLine($"  Interaksi    : hari {r.LastInteractionDay}");
+        }
+
+        Ui.Pause();
+    }
+
+    private static void ShowAgreements(int playerId)
+    {
+        Ui.Title("Perjanjian Perusahaan");
+
+        var agreements = AiSocialSvc.Agreements(playerId);
+
+        if (agreements.Count == 0)
+        {
+            Ui.Empty("Belum ada perjanjian.");
+            Ui.Pause();
+            return;
+        }
+
+        foreach (var a in agreements)
+        {
+            int other = a.CompanyA == playerId
+                ? a.CompanyB
+                : a.CompanyA;
+
+            Console.WriteLine();
+            Console.WriteLine($"  Mitra      : {AiSocialSvc.CompanyName(other)}");
+            Console.WriteLine($"  Jenis      : {a.AgreementType}");
+            Console.WriteLine($"  Status     : {a.Status}");
+            Console.WriteLine($"  Dibuat     : hari {a.CreatedDay}");
+            Console.WriteLine($"  Berakhir   : hari {a.ExpiresDay}");
+            Console.WriteLine($"  Ketentuan  : {a.Terms}");
         }
 
         Ui.Pause();

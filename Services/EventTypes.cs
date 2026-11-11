@@ -1,6 +1,6 @@
+
 namespace Nusantara.Services;
 
-// Satu makna = satu nama. Pakai konstanta ini, bukan string literal.
 public static class EventTypes
 {
     public const string CompanyFounded = "COMPANY_FOUNDED";
@@ -20,10 +20,30 @@ public static class EventTypes
     public const string BidPlaced = "BID_PLACED";
     public const string ContractAwarded = "CONTRACT_AWARDED";
 
+    public const string CompanyRelationChanged = "COMPANY_RELATION_CHANGED";
+    public const string CompanyAgreementSigned = "COMPANY_AGREEMENT_SIGNED";
+    public const string CompanyAgreementExpired = "COMPANY_AGREEMENT_EXPIRED";
+
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
-        CompanyFounded, TruckBought, TruckServiced, BodyInstallStarted, DriverHired, DriverFired,
-        ContractAccepted, TripDispatched, TripCompleted, MonthClosed, LoanTaken, TruckSeized,
-        TierUpgraded, WorldEvent
+        CompanyFounded,
+        TruckBought,
+        TruckServiced,
+        BodyInstallStarted,
+        DriverHired,
+        DriverFired,
+        ContractAccepted,
+        TripDispatched,
+        TripCompleted,
+        MonthClosed,
+        LoanTaken,
+        TruckSeized,
+        TierUpgraded,
+        WorldEvent,
+        BidPlaced,
+        ContractAwarded,
+        CompanyRelationChanged,
+        CompanyAgreementSigned,
+        CompanyAgreementExpired
     };
 }
