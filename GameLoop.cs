@@ -101,11 +101,15 @@ public static class GameLoop
                     break;
 
                 case "15":
-                    CompanyChatMenu.Run(pid);
+                    RunProtectedMenu(
+                        "Komunikasi Antar Perusahaan",
+                        () => CompanyChatMenu.Run(pid));
                     break;
 
                 case "16":
-                    CompetitorMenu.Run(pid);
+                    RunProtectedMenu(
+                        "Pusat Intelijen Kompetitor",
+                        () => CompetitorMenu.Run(pid));
                     break;
 
                 case "p":
@@ -146,6 +150,42 @@ public static class GameLoop
                 case "0":
                     return;
             }
+        }
+    }
+
+    private static void RunProtectedMenu(
+        string menuName,
+        Action menuAction)
+    {
+        try
+        {
+            menuAction();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine();
+            Ui.Line('=');
+            Console.WriteLine($"  ERROR PADA MENU: {menuName}");
+            Ui.Line('=');
+
+            Console.WriteLine(
+                $"  Jenis error : {ex.GetType().Name}");
+
+            Console.WriteLine(
+                $"  Pesan       : {ex.Message}");
+
+            Console.WriteLine();
+            Console.WriteLine(
+                "  Permainan tidak dihentikan.");
+
+            Console.WriteLine(
+                "  Kamu akan dikembalikan ke dashboard.");
+
+            Console.WriteLine();
+            Console.WriteLine("  Detail teknis:");
+            Console.WriteLine(ex);
+
+            Ui.Pause();
         }
     }
 }

@@ -4,32 +4,34 @@ using Nusantara.Database;
 
 namespace Nusantara.Services;
 
-public sealed record CompetitorOverview(
-    int Id,
-    string Name,
-    string Personality,
-    int Tier,
-    int Reputation,
-    long Cash,
-    bool Bankrupt,
-    int Trucks,
-    int ActiveTrips,
-    int ActiveContracts,
-    int Drivers,
-    string RelationStatus,
-    int Trust,
-    int Respect,
-    int Grievance,
-    int LastInteractionDay
-);
+public sealed class CompetitorOverview
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public string Personality { get; set; } = "";
+    public int Tier { get; set; }
+    public int Reputation { get; set; }
+    public long Cash { get; set; }
+    public bool Bankrupt { get; set; }
+    public int Trucks { get; set; }
+    public int ActiveTrips { get; set; }
+    public int ActiveContracts { get; set; }
+    public int Drivers { get; set; }
+    public string RelationStatus { get; set; } = "NEUTRAL";
+    public int Trust { get; set; }
+    public int Respect { get; set; }
+    public int Grievance { get; set; }
+    public int LastInteractionDay { get; set; }
+}
 
-public sealed record CompetitorActivity(
-    int Day,
-    string Action,
-    string Status,
-    string Reason,
-    string Detail
-);
+public sealed class CompetitorActivity
+{
+    public int Day { get; set; }
+    public string Action { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string Reason { get; set; } = "";
+    public string Detail { get; set; } = "";
+}
 
 public static class CompetitorIntelSvc
 {
@@ -87,19 +89,26 @@ AND p.id <> @playerId
 ORDER BY Reputation DESC, Trucks DESC, p.name
 """, new { playerId }).ToList();
 
-        return companies.Select(x =>
+        foreach (var company in companies)
         {
-            var memory = AiSocialSvc.Memory(playerId, x.Id);
+            var memory = AiSocialSvc.Memory(
+                playerId,
+                company.Id);
 
-            return x with
-            {
-                RelationStatus = AiSocialSvc.RelationStatus(playerId, x.Id),
-                Trust = memory?.Trust ?? 0,
-                Respect = memory?.Respect ?? 0,
-                Grievance = memory?.Grievance ?? 0,
-                LastInteractionDay = memory?.LastInteractionDay ?? 0
-            };
-        }).ToList();
+            company.RelationStatus =
+                AiSocialSvc.RelationStatus(
+                    playerId,
+                    company.Id);
+
+            company.Trust = memory?.Trust ?? 0;
+            company.Respect = memory?.Respect ?? 0;
+            company.Grievance = memory?.Grievance ?? 0;
+
+            company.LastInteractionDay =
+                memory?.LastInteractionDay ?? 0;
+        }
+
+        return companies;
     }
 
     public static List<CompetitorActivity> RecentActivity(
@@ -133,6 +142,7 @@ LIMIT @limit
         if (cash < 300_000_000) return "Rendah";
         if (cash < 750_000_000) return "Menengah";
         if (cash < 1_500_000_000) return "Kuat";
+
         return "Sangat kuat";
     }
 

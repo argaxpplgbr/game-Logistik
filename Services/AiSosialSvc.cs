@@ -4,49 +4,55 @@ using Nusantara.Database;
 
 namespace Nusantara.Services;
 
-public sealed record CompanyMessage(
-    long Id,
-    int SenderId,
-    int RecipientId,
-    string MessageType,
-    string Body,
-    int Day,
-    string Status,
-    string? Reply
-);
 
-public sealed record AiSocialMemory(
-    int CompanyId,
-    int OtherCompanyId,
-    int Trust,
-    int Respect,
-    int Grievance,
-    int LastInteractionDay,
-    int LastContactDay,
-    string Notes
-);
+public sealed class CompanyMessage
+{
+    public long Id { get; set; }
+    public int SenderId { get; set; }
+    public int RecipientId { get; set; }
+    public string MessageType { get; set; } = "";
+    public string Body { get; set; } = "";
+    public int Day { get; set; }
+    public string Status { get; set; } = "";
+    public string? Reply { get; set; }
+}
 
-public sealed record CompanyAgreement(
-    long Id,
-    int CompanyA,
-    int CompanyB,
-    string AgreementType,
-    string Status,
-    int CreatedDay,
-    int ExpiresDay,
-    string Terms
-);
+public sealed class AiSocialMemory
+{
+    public int CompanyId { get; set; }
+    public int OtherCompanyId { get; set; }
+    public int Trust { get; set; }
+    public int Respect { get; set; }
+    public int Grievance { get; set; }
+    public int LastInteractionDay { get; set; }
+    public int LastContactDay { get; set; }
+    public string Notes { get; set; } = "";
+}
 
-public sealed record AiRelationship(
-    int OtherCompanyId,
-    string OtherCompanyName,
-    string RelationStatus,
-    int Trust,
-    int Respect,
-    int Grievance,
-    int LastInteractionDay,
-    int LastContactDay
-);
+public sealed class CompanyAgreement
+{
+    public long Id { get; set; }
+    public int CompanyA { get; set; }
+    public int CompanyB { get; set; }
+    public string AgreementType { get; set; } = "";
+    public string Status { get; set; } = "";
+    public int CreatedDay { get; set; }
+    public int ExpiresDay { get; set; }
+    public string Terms { get; set; } = "";
+}
+
+public sealed class AiRelationship
+{
+    public int OtherCompanyId { get; set; }
+    public string OtherCompanyName { get; set; } = "";
+    public string RelationStatus { get; set; } = "";
+    public int Trust { get; set; }
+    public int Respect { get; set; }
+    public int Grievance { get; set; }
+    public int LastInteractionDay { get; set; }
+    public int LastContactDay { get; set; }
+}
+
 
 public static class AiSocialSvc
 {
