@@ -1,4 +1,3 @@
-
 using Dapper;
 using Nusantara.Database;
 
@@ -598,13 +597,15 @@ AND status='PENDING'
         {
             newStatus = "HOSTILE";
 
+            var pair = Pair(sender, receiver);
+
             c.Execute("""
 UPDATE ai_social_agreements
 SET status='BROKEN'
 WHERE company_a=@a
 AND company_b=@b
 AND status='ACTIVE'
-""", Pair(sender, receiver), tx);
+""", new { a = pair.a, b = pair.b }, tx);
         }
         else if (accept)
         {
@@ -678,8 +679,8 @@ VALUES(
 )
 """, new
             {
-                pair.a,
-                pair.b,
+                a = pair.a,
+                b = pair.b,
                 agreementType,
                 day,
                 expiresDay = day + duration,
@@ -769,8 +770,8 @@ DO UPDATE SET
     since_day=@day
 """, new
         {
-            pair.a,
-            pair.b,
+            a = pair.a,
+            b = pair.b,
             status,
             day
         }, tx);
@@ -788,7 +789,7 @@ DO UPDATE SET
 SELECT status
 FROM company_relations
 WHERE company_a=@a AND company_b=@b
-""", pair, tx) ?? "NEUTRAL";
+""", new { a = pair.a, b = pair.b }, tx) ?? "NEUTRAL";
     }
 
     private static (int a, int b) Pair(int x, int y) =>
@@ -998,7 +999,7 @@ SELECT status
 FROM company_relations
 WHERE company_a=@a
 AND company_b=@b
-""", pair) ?? "NEUTRAL";
+""", new { a = pair.a, b = pair.b }) ?? "NEUTRAL";
     }
 
     public static List<AiRelationship> Relationships(int companyId)

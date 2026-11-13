@@ -1,4 +1,3 @@
-
 using Dapper;
 using Nusantara.Database;
 using Nusantara.Services;
@@ -7,7 +6,12 @@ namespace Nusantara.Menus;
 
 public static class CompanyChatMenu
 {
-    private sealed record CompanyOption(int Id, string Name, string Kind);
+    private sealed class CompanyOption
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string Kind { get; set; } = "";
+    }
 
     public static void Run(int playerId)
     {
@@ -28,19 +32,15 @@ public static class CompanyChatMenu
                 case "1":
                     ShowInbox(playerId);
                     break;
-
                 case "2":
                     Send(playerId);
                     break;
-
                 case "3":
                     ShowRelations(playerId);
                     break;
-
                 case "4":
                     ShowAgreements(playerId);
                     break;
-
                 case "0":
                     return;
             }
@@ -66,7 +66,6 @@ public static class CompanyChatMenu
 
             Console.WriteLine();
             Ui.Line();
-
             Console.WriteLine($"Dari      : {sender}");
             Console.WriteLine($"Jenis     : {m.MessageType}");
             Console.WriteLine($"Hari      : {m.Day}");
@@ -81,7 +80,6 @@ public static class CompanyChatMenu
 
             Console.WriteLine();
             bool accept = Ui.Yes("Terima pesan/tawaran ini? (y/n): ");
-
             string reply = Ui.Ask("Balasan: ");
 
             bool result = AiSocialSvc.Respond(
@@ -131,9 +129,7 @@ ORDER BY kind, name
         for (int i = 0; i < companies.Count; i++)
         {
             var company = companies[i];
-
-            Console.WriteLine(
-                $"  {i + 1}. {company.Name} ({company.Kind})");
+            Console.WriteLine($"  {i + 1}. {company.Name} ({company.Kind})");
         }
 
         int selected = Ui.Num("\nPilih perusahaan: ", -1);
@@ -191,8 +187,7 @@ ORDER BY kind, name
                 body,
                 CompanySvc.WorldDay());
 
-            Console.WriteLine(
-                $"\nPesan berhasil dikirim. ID pesan: {id}");
+            Console.WriteLine($"\nPesan berhasil dikirim. ID pesan: {id}");
         }
         catch (Exception ex)
         {
