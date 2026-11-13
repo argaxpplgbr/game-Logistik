@@ -9,6 +9,7 @@ public static class EventTypes
     public const string BodyInstallStarted = "BODY_INSTALL_STARTED";
     public const string DriverHired = "DRIVER_HIRED";
     public const string DriverFired = "DRIVER_FIRED";
+    public const string DriverTrained = "DRIVER_TRAINED";
     public const string ContractAccepted = "CONTRACT_ACCEPTED";
     public const string TripDispatched = "TRIP_DISPATCHED";
     public const string TripCompleted = "TRIP_COMPLETED";
@@ -26,24 +27,10 @@ public static class EventTypes
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>
     {
-        CompanyFounded,
-        TruckBought,
-        TruckServiced,
-        BodyInstallStarted,
-        DriverHired,
-        DriverFired,
-        ContractAccepted,
-        TripDispatched,
-        TripCompleted,
-        MonthClosed,
-        LoanTaken,
-        TruckSeized,
-        TierUpgraded,
-        WorldEvent,
-        BidPlaced,
-        ContractAwarded,
-        CompanyRelationChanged,
-        CompanyAgreementSigned,
-        CompanyAgreementExpired
+        CompanyFounded, TruckBought, TruckServiced, BodyInstallStarted,
+        DriverHired, DriverFired, DriverTrained, ContractAccepted,
+        TripDispatched, TripCompleted, MonthClosed, LoanTaken,
+        TruckSeized, TierUpgraded, WorldEvent, BidPlaced, ContractAwarded,
+        CompanyRelationChanged, CompanyAgreementSigned, CompanyAgreementExpired
     };
 }

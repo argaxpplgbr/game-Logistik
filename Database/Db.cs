@@ -1,4 +1,5 @@
-using System.Data;
+
+﻿using System.Data;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -9,8 +10,6 @@ using Nusantara.Services;
 
 namespace Nusantara.Database;
 
-// Dapper tidak otomatis memahami DateTime di SQLite (disimpan sebagai TEXT), jadi ditangani di sini.
-// Format tetap "yyyy-MM-dd HH:mm:ss.fff" supaya perbandingan teks (<=, >=) sama dengan urutan waktu.
 public sealed class SimDateTimeHandler : SqlMapper.TypeHandler<DateTime>
 {
     public override void SetValue(IDbDataParameter parameter, DateTime value)
@@ -29,17 +28,17 @@ public sealed class SimDateTimeHandler : SqlMapper.TypeHandler<DateTime>
 
 public static class Db
 {
-    public const string GameVersion = "4.0";
+    public const string GameVersion = "5.0";
 
     sealed record Migration(int Version, string Name, string Sql);
 
-    // Tambah migrasi baru di akhir daftar ini. Jangan ubah isi migrasi lama yang sudah dirilis.
     static readonly Migration[] Migrations =
     {
         new(1, "skema_dasar_sqlite", SchemaSqlite.V1),
         new(2, "event_ledger_berita", SchemaV2.Sql),
         new(3, "kesehatan_save_dan_job_log", SchemaV3.Sql),
-        new(4, "perusahaan_ai_dan_pasar_bersama", SchemaV4.Sql)
+        new(4, "perusahaan_ai_dan_pasar_bersama", SchemaV4.Sql),
+        new(5, "jejak_operasional_dan_pengembangan_karyawan", SchemaV5.Sql)
     };
 
     static string? connStr;
@@ -51,7 +50,6 @@ public static class Db
     public static bool HasSlot => connStr != null;
     public static string FilePath => filePath ?? throw new InvalidOperationException("Belum ada slot save yang dibuka.");
 
-    // Panggil sekali di awal program, sebelum query pertama.
     public static void Init()
     {
         if (ready) return;
@@ -78,7 +76,6 @@ public static class Db
         Generation++;
     }
 
-    // Lepas slot aktif dan tutup semua koneksi supaya file bisa dicadangkan/dihapus.
     public static void Release()
     {
         connStr = null;
@@ -107,7 +104,6 @@ public static class Db
         return c.ExecuteScalar<string>("PRAGMA quick_check") ?? "tidak ada hasil";
     }
 
-    // Jumlah migrasi yang belum diterapkan pada slot aktif.
     public static int PendingMigrations()
     {
         using var c = Open();
@@ -117,7 +113,6 @@ public static class Db
         return Migrations.Count(m => !applied.Contains(m.Version));
     }
 
-    // Aman dipanggil berkali-kali. Tiap migrasi satu transaksi: gagal = batal, data tidak berubah.
     public static void Migrate()
     {
         using var c = Open();
@@ -141,14 +136,12 @@ public static class Db
             }
             catch (Exception ex)
             {
-                try { tx.Rollback(); } catch { /* sudah batal */ }
+                try { tx.Rollback(); } catch { }
                 throw new InvalidOperationException($"Migrasi {m.Version} ({m.Name}) gagal: {ex.Message}", ex);
             }
         }
     }
 
-    // Potong kas atomik + catat ledger. Berhasil hanya jika kas cukup. Dipakai di dalam transaksi.
-    // Kategori kosong = nama method pemanggil (dipetakan ke label di LedgerSvc).
     public static bool Spend(IDbConnection c, IDbTransaction tx, int pid, long cost,
         string cat = "", string note = "", int? tripId = null, [CallerMemberName] string caller = "")
     {
@@ -158,8 +151,6 @@ public static class Db
         return true;
     }
 
-    // Tambah/kurangi kas tanpa cek saldo (pemasukan, atau biaya yang memang boleh membuat kas minus).
-    // Mengembalikan saldo setelah transaksi. Nilai 0 tidak dicatat.
     public static long Post(IDbConnection c, IDbTransaction tx, int pid, long amount,
         string cat, string note = "", int? tripId = null)
     {
@@ -168,8 +159,6 @@ public static class Db
         return Log(c, tx, pid, amount, cat, note, tripId);
     }
 
-    // Tulis satu baris ledger (tidak mengubah kas). Mengembalikan saldo saat ini.
-    // Waktu ledger memakai jam SIMULASI, bukan jam dinding.
     public static long Log(IDbConnection c, IDbTransaction tx, int pid, long amount,
         string cat, string note = "", int? tripId = null)
     {
